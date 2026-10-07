@@ -1,6 +1,13 @@
 // LAN-only fixture input validation, not cryptography or visitor authorization.
 // The shared Rust/WASM client subsequently validates the actual pins/descriptor.
-export function hostedConfiguration(input) {
+export interface Configuration {
+  readonly multiaddr: string;
+  readonly label: string;
+  readonly messageLimit: number;
+  readonly mode: string;
+}
+
+export function hostedConfiguration(input: unknown): Readonly<Configuration> {
   if (typeof input !== "string" || input.length > 4096) {
     throw new Error("Paste one public helper descriptor (maximum 4096 characters)");
   }

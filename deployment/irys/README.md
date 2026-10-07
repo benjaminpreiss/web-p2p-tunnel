@@ -3,18 +3,17 @@
 The Pages workflow is replaced by `.github/workflows/irys.yaml`. It builds the
 **current PQ/MASQUE browser diagnostic**, not the historical signaling-based
 `web/` application. No real upload, funding transaction, or GitHub environment
-configuration has been performed by the agent. The first CI release-WASM build
-and live publication still need verification.
+configuration has been performed by the agent. The user has completed the initial
+funding, publication, and hosted-phone LAN echo. The Vite migration is checked
+locally but still needs its own CI publication and real-phone acceptance run.
 
 ## Frontend choice
 
-No UI framework is needed. Native modules, semantic HTML, and responsive CSS
-are sufficient for this small interface; design quality does not require React.
-The existing allowlist exporter is the current build pipeline. **Vite + vanilla
-TypeScript** is the recommended next step when migrating the existing frontend
-to TypeScript or adding minification/dev-server tooling—not a UI framework or
-browser runtime dependency. This change does not migrate the older JavaScript
-frontend or the legacy `web/` app.
+The active app is now **Vite + vanilla TypeScript + CSS**, with no UI framework.
+Vite bundles/minifies the UI, while an explicit exporter preserves the bounded
+upload allowlist. The generated crypto JS/WASM remain external, at stable relative
+paths. The legacy `web/` app is unchanged. See
+[`apps/browser/README.md`](../../apps/browser/README.md) for build and dev commands.
 
 The new publisher and its tests **are TypeScript**, checked with `tsc`, and run
 using Node 24's native type stripping. No `any`-based SDK wrapper or transpilation
@@ -91,9 +90,11 @@ There are no Pages permissions or OIDC grants.
 ## What gets published
 
 Only the five HTML/JS/WASM assets in
-`apps/browser/dist/irys-browser/`. The publisher independently rejects
+`apps/browser/dist/irys-browser/`: `index.html`, `app.js`, `style.css`,
+`pkg/relay_crypto.js`, and `pkg/relay_crypto_bg.wasm`. The parser formerly shipped
+as `hosted-config.mjs` is bundled into `app.js`. The publisher independently rejects
 extra files, symlinks, local-mode HTML, missing assets and malformed WASM.
-Explicit Content-Type tags include JavaScript for `.mjs` and `application/wasm`.
+Explicit Content-Type tags include JavaScript, `text/css`, and `application/wasm`.
 All files are signed locally first, so a complete `irys/paths` folder manifest can
 reference their IDs. Files upload first; the index manifest uploads last. No
 session descriptor, wallet key, SDK package, source map, or helper log belongs in
@@ -160,6 +161,7 @@ The SDK must remain confined to the publisher; never put it in the browser bundl
 ## Local checks (no wallet, no payment)
 
 ```sh
+npm ci --prefix apps/browser --ignore-scripts
 cd deployment/irys
 npm ci --ignore-scripts
 npm run typecheck

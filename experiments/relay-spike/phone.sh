@@ -11,12 +11,14 @@ BROWSER="$PWD/../../apps/browser"
 
 case "${1:-}" in
     build)
+        npm ci --prefix "$BROWSER" --ignore-scripts
         "$HOME/.cargo/bin/cargo" test --locked --offline
         "$HOME/.cargo/bin/cargo" build --locked --offline
-        if [[ ! -s "$BROWSER/pkg/relay_crypto.js" || ! -s "$BROWSER/pkg/relay_crypto_bg.wasm" ]]; then
+        if [[ ! -s "$BROWSER/pkg/relay_crypto.js" || ! -s "$BROWSER/pkg/relay_crypto_bg.wasm" || ! -s "$BROWSER/pkg/relay_crypto.d.ts" ]]; then
             echo 'Building missing WASM assets. wasm-pack may download its binding tooling/dependencies.'
             node "$BROWSER/build.ts" --dev
         fi
+        npm --prefix "$BROWSER" run build:frontend
         ;;
     run)
         if [[ $# != 3 ]]; then
@@ -24,7 +26,7 @@ case "${1:-}" in
             exit 1
         fi
         [[ -x target/debug/relay-spike ]] || { echo 'Run phone.sh build first.' >&2; exit 1; }
-        [[ -s "$BROWSER/pkg/relay_crypto.js" && -s "$BROWSER/pkg/relay_crypto_bg.wasm" ]] || { echo 'Missing browser WASM assets; run phone.sh build.' >&2; exit 1; }
+        [[ -s "$BROWSER/dist/local-browser/app.js" && -s "$BROWSER/dist/local-browser/pkg/relay_crypto_bg.wasm" ]] || { echo 'Missing browser bundle; run phone.sh build.' >&2; exit 1; }
         [[ "$("$ADB" get-state)" == device ]] || { echo 'One authorized USB device is required.' >&2; exit 1; }
         # Do not replace or remove another session's reverse mapping.
         "$ADB" reverse --no-rebind "tcp:$PORT" "tcp:$PORT"
