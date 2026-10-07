@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en" data-fixture="local">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Browser relay experiment</title>
+  <style>
+    body { max-width: 56rem; margin: 2rem auto; padding: 0 1rem; font: 16px/1.5 system-ui, sans-serif; color: #e7eaf0; background: #121722; }
+    label, input, textarea, button { display: block; }
+    textarea { box-sizing: border-box; width: 100%; min-height: 8rem; margin-bottom: 1rem; font: inherit; overflow-wrap: anywhere; }
+    input { box-sizing: border-box; width: 100%; padding: .6rem; margin: .4rem 0 1rem; font: inherit; }
+    button { padding: .7rem 1rem; font: inherit; cursor: pointer; }
+    button:disabled { cursor: default; opacity: .6; }
+    pre { padding: 1rem; background: #080c13; white-space: pre-wrap; overflow-wrap: anywhere; }
+    #status { font-weight: 700; }
+    .note { color: #b5bfd0; }
+  </style>
+</head>
+<body>
+  <h1>Browser → relay → helper</h1>
+  <p>This is a bounded connectivity experiment, not the localhost HTTP tunnel.</p>
+  <p class="note">Uses your browser's standard WebRTC and Saorsa's Rust/WASM PQ session. No wallet, external STUN server, or public relay is used.</p>
+  <p><strong>One attempt per CLI run.</strong> Restart the terminal command before retrying, reloading, or switching browsers.</p>
+  <section id="hosted-connection" hidden>
+    <p>Hosted-page LAN test: keep the phone and helper on the same Wi-Fi. No USB is needed.</p>
+    <label for="descriptor">Public connection descriptor from your running helper</label>
+    <textarea id="descriptor" maxlength="4096" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="/ip4/.../udp/.../webrtc-direct/certhash/.../p2p/..."></textarea>
+    <p class="note">Paste only from your own helper using a trusted transfer method. This contains a public endpoint and identity, not an access grant. It is not saved or put in a URL. Do not paste wallet keys or other secrets.</p>
+  </section>
+  <label for="message">Echo message (up to 8 KiB; use no secrets)</label>
+  <input id="message" value="hello from a real browser" maxlength="8192">
+  <button id="run" disabled>Connect and verify encrypted echo</button>
+  <p id="status" role="status">Loading WASM…</p>
+  <h2>Diagnostics — copy this back</h2>
+  <pre id="log" aria-live="polite"></pre>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

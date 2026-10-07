@@ -1,0 +1,11 @@
+{
+  "name": "web-p2p-browser",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "build": "node build.ts --release && node export.ts",
+    "export": "node export.ts",
+    "test": "node --test tests/*.test.mjs tests/*.test.ts"
+  }
+}

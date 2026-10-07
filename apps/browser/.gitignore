@@ -1,0 +1,4 @@
+/pkg/
+/crypto/target/
+/dist/
+__pycache__/

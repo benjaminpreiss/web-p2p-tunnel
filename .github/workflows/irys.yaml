@@ -1,0 +1,120 @@
+name: Build and publish website to Irys
+
+on:
+  # Base-repository context permits secrets after a reviewed fork PR is merged.
+  # Never run PR-head code: jobs are gated on merged=true and checkout the merge SHA.
+  pull_request_target:
+    branches: [main]
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      fund_to_usdc:
+        description: "Funding only; never publishes. USDC balance target (0 = build checks only)"
+        type: string
+        required: true
+        default: "0"
+
+permissions:
+  contents: read
+
+# Never cancel a job while it may be sending a funding/upload transaction.
+concurrency:
+  group: irys-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: deployment/irys/package-lock.json
+      - name: Check TypeScript publisher (no wallet access)
+        run: |
+          npm ci --prefix deployment/irys --ignore-scripts
+          npm --prefix deployment/irys run typecheck
+          npm --prefix deployment/irys test
+      - name: Check frontend and exporter
+        run: |
+          node --input-type=module --check < apps/browser/app.js
+          npm --prefix apps/browser test
+      - name: Install WASM build tools
+        run: |
+          rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown
+          cargo +stable install wasm-pack --version 0.13.1 --locked
+      - name: Build release PQ WASM and export static website
+        env:
+          RUSTUP_TOOLCHAIN: stable
+        run: |
+          node apps/browser/build.ts --release
+          node apps/browser/export.ts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: irys-website
+          path: apps/browser/dist/irys-browser/
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: ${{ github.event_name == 'workflow_dispatch' && 'Fund Irys credit (no upload)' || 'Publish website to Irys' }}
+    needs: build
+    if: >-
+      vars.IRYS_PUBLISH_ENABLED == 'true' &&
+      ((github.event_name == 'pull_request_target' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main') ||
+       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.fund_to_usdc != '0'))
+    environment:
+      name: irys-production
+      url: ${{ steps.publish.outputs.url }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: deployment/irys/package-lock.json
+      - name: Install locked publisher without lifecycle scripts or wallet access
+        run: npm ci --prefix deployment/irys --ignore-scripts
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: irys-website
+          path: apps/browser/dist/irys-browser/
+      - name: Fund prepaid Irys credit only (no uploads)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          IRYS_WALLET_KEY: ${{ secrets.IRYS_WALLET_KEY }}
+          IRYS_SOLANA_RPC_URL: ${{ secrets.IRYS_SOLANA_RPC_URL }}
+          IRYS_MAX_UPLOAD_USDC: ${{ vars.IRYS_MAX_UPLOAD_USDC || '0.10' }}
+          IRYS_MAX_FUND_USDC: ${{ vars.IRYS_MAX_FUND_USDC || '1.00' }}
+          IRYS_FUND_TO_USDC: ${{ inputs.fund_to_usdc }}
+        run: npm --prefix deployment/irys run publish:site -- --fund-only
+      - name: Publish merged main commit and report gateway URL
+        id: publish
+        if: github.event_name == 'pull_request_target' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main'
+        env:
+          IRYS_WALLET_KEY: ${{ secrets.IRYS_WALLET_KEY }}
+          IRYS_SOLANA_RPC_URL: ${{ secrets.IRYS_SOLANA_RPC_URL }}
+          IRYS_MAX_UPLOAD_USDC: ${{ vars.IRYS_MAX_UPLOAD_USDC || '0.10' }}
+          IRYS_MAX_FUND_USDC: ${{ vars.IRYS_MAX_FUND_USDC || '1.00' }}
+          IRYS_FUND_TO_USDC: "0"
+        run: npm --prefix deployment/irys run publish:site
+      - name: Preserve public receipt/progress, including partial failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: irys-publication-${{ github.run_id }}-${{ github.run_attempt }}
+          path: deployment/irys/reports/publication.json
+          if-no-files-found: warn
+          retention-days: 30
