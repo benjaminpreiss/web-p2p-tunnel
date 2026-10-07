@@ -32,7 +32,7 @@ export interface PublishOptions {
 export const FILES: Readonly<Record<string, string>> = Object.freeze({
   "index.html": "text/html; charset=utf-8",
   "app.js": "text/javascript; charset=utf-8",
-  "hosted-config.mjs": "text/javascript; charset=utf-8",
+  "style.css": "text/css; charset=utf-8",
   "pkg/relay_crypto.js": "text/javascript; charset=utf-8",
   "pkg/relay_crypto_bg.wasm": "application/wasm",
 });

@@ -36,15 +36,17 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: deployment/irys/package-lock.json
+          cache-dependency-path: |
+            apps/browser/package-lock.json
+            deployment/irys/package-lock.json
       - name: Check TypeScript publisher (no wallet access)
         run: |
+          npm ci --prefix apps/browser --ignore-scripts
           npm ci --prefix deployment/irys --ignore-scripts
           npm --prefix deployment/irys run typecheck
           npm --prefix deployment/irys test
       - name: Check frontend and exporter
         run: |
-          node --input-type=module --check < apps/browser/app.js
           npm --prefix apps/browser test
       - name: Install WASM build tools
         run: |
@@ -55,7 +57,8 @@ jobs:
           RUSTUP_TOOLCHAIN: stable
         run: |
           node apps/browser/build.ts --release
-          node apps/browser/export.ts
+          npm --prefix apps/browser run build:frontend
+          npm --prefix apps/browser run test:bundle
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: irys-website

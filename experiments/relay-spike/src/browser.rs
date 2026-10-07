@@ -28,17 +28,21 @@ const BROWSER_LIFETIME: Duration = Duration::from_secs(600);
 const MAX_ASSET_BYTES: u64 = 16 * 1024 * 1024;
 
 struct Assets {
+    html: Vec<u8>,
+    application: Vec<u8>,
+    stylesheet: Vec<u8>,
     javascript: Vec<u8>,
     wasm: Vec<u8>,
 }
 
 impl Assets {
     async fn load() -> Result<Self> {
-        let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/browser/pkg");
+        let directory =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/browser/dist/local-browser");
         async fn read(path: &Path) -> Result<Vec<u8>> {
             let metadata = tokio::fs::metadata(path).await.with_context(|| {
                 format!(
-                    "{} is missing; build apps/browser/crypto with wasm-pack first",
+                    "{} is missing; run npm --prefix apps/browser run build first",
                     path.display()
                 )
             })?;
@@ -49,8 +53,11 @@ impl Assets {
             Ok(tokio::fs::read(path).await?)
         }
         Ok(Self {
-            javascript: read(&directory.join("relay_crypto.js")).await?,
-            wasm: read(&directory.join("relay_crypto_bg.wasm")).await?,
+            html: read(&directory.join("index.html")).await?,
+            application: read(&directory.join("app.js")).await?,
+            stylesheet: read(&directory.join("style.css")).await?,
+            javascript: read(&directory.join("pkg/relay_crypto.js")).await?,
+            wasm: read(&directory.join("pkg/relay_crypto_bg.wasm")).await?,
         })
     }
 }
@@ -372,20 +379,16 @@ async fn http_request(
         ("405 Method Not Allowed", "text/plain", b"GET only".to_vec())
     } else {
         match path {
-            "/" | "/index.html" => (
-                "200 OK",
-                "text/html; charset=utf-8",
-                include_bytes!("../../../apps/browser/index.html").to_vec(),
-            ),
+            "/" | "/index.html" => ("200 OK", "text/html; charset=utf-8", assets.html.clone()),
             "/app.js" => (
                 "200 OK",
                 "text/javascript; charset=utf-8",
-                include_bytes!("../../../apps/browser/app.js").to_vec(),
+                assets.application.clone(),
             ),
-            "/hosted-config.mjs" => (
+            "/style.css" => (
                 "200 OK",
-                "text/javascript; charset=utf-8",
-                include_bytes!("../../../apps/browser/hosted-config.mjs").to_vec(),
+                "text/css; charset=utf-8",
+                assets.stylesheet.clone(),
             ),
             "/session.json" => ("200 OK", "application/json", configuration.to_vec()),
             "/stats.json" => (

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -24,11 +24,17 @@ function fixture() {
 test("exports only the five static assets, with hosted mode and external checksums", () => {
   const f = fixture();
   try {
+    for (const name of [...FILES, "session.json"]) {
+      const target = join(f.source, "dist/frontend", name);
+      mkdirSync(dirname(target), { recursive: true });
+      copyFileSync(join(f.source, name), target);
+    }
     const assets = exportSite(f.source);
     const output = join(f.source, "dist/irys-browser");
     assert.deepEqual(readdirSync(output, { recursive: true }).filter((name) => name !== "pkg").sort(), [...FILES].sort());
     assert.match(readFileSync(join(output, "index.html"), "utf8"), /data-fixture="hosted"/);
     assert.match(readFileSync(join(f.source, "index.html"), "utf8"), /data-fixture="local"/);
+    assert.match(readFileSync(join(f.source, "dist/local-browser/index.html"), "utf8"), /data-fixture="local"/);
     const expected = [...assets].map(([name, bytes]) => `${createHash("sha256").update(bytes).digest("hex")}  ${name}\n`).join("");
     assert.equal(readFileSync(join(f.source, "dist/irys-browser.SHA256SUMS"), "utf8"), expected);
   } finally { f.close(); }

@@ -8,7 +8,6 @@ export CARGO_TARGET_DIR="$PWD/target"
 BROWSER="$PWD/../../apps/browser"
 
 check_static() {
-    node --input-type=module --check < "$BROWSER/app.js"
     npm --prefix "$BROWSER" test
 }
 
@@ -16,12 +15,13 @@ case "${1:-}" in
     build)
         check_static
         bash phone.sh build
-        node "$BROWSER/export.ts"
+        # phone.sh build also prepares the local and hosted Vite bundles.
         ;;
     bundle)
-        # Useful for regenerating only the static bundle; does not rebuild Rust.
+        # Rebuild the frontend with existing WASM; does not rebuild Rust.
+        npm ci --prefix "$BROWSER" --ignore-scripts
         check_static
-        node "$BROWSER/export.ts"
+        npm --prefix "$BROWSER" run build:frontend
         ;;
     run)
         [[ $# == 3 ]] || { echo 'Usage: bash experiments/relay-spike/hosted.sh run <Mac-private-IPv4> <phone-private-IPv4>' >&2; exit 1; }

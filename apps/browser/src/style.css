@@ -1,0 +1,25 @@
+:root { font-family: system-ui, sans-serif; color: #e6edf3; background: #0b111a; line-height: 1.65; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: radial-gradient(ellipse at top right, #17372f 0, transparent 55%); }
+main { max-width: 52rem; margin: auto; padding: clamp(1.25rem, 4vw, 3rem); }
+h1 { font-size: clamp(2.5rem, 7vw, 4.5rem); line-height: 1.08; letter-spacing: -.055em; margin: 2rem 0 1rem; }
+h1 em { color: #8be5c3; font-style: normal; }
+h2 { font-size: 1.1rem; margin-top: 2.5rem; }
+.eyebrow { display: flex; justify-content: space-between; gap: 1rem; font-size: .75rem; font-weight: 700; letter-spacing: .13em; }
+.eyebrow span { color: #a8b6c5; }
+.route { font-size: .9rem; color: #cbd7e4; }
+.route span { padding: 0 .3rem; color: #8be5c3; }
+p { margin: 1rem 0; }
+.note { color: #b2bfd0; font-size: .9rem; }
+section { border-top: 1px solid #344454; padding-top: 1rem; margin-top: 2rem; }
+label { display: block; font-size: .9rem; font-weight: 650; margin: 1.2rem 0 .4rem; }
+input, textarea, button { display: block; width: 100%; font: inherit; border-radius: .65rem; }
+input, textarea { border: 1px solid #536477; background: #101c28; color: #f0f5fa; padding: .8rem 1rem; }
+textarea { min-height: 8rem; resize: vertical; overflow-wrap: anywhere; font-family: ui-monospace, monospace; font-size: .85rem; }
+button { padding: .9rem 1rem; margin: 1.4rem 0; border: 1px solid #8be5c3; background: #8be5c3; color: #10271e; font-weight: 750; cursor: pointer; }
+button:hover:enabled { background: #b2f4db; }
+button:disabled { opacity: .5; cursor: default; }
+:focus-visible { outline: 3px solid #a7d5ff; outline-offset: 3px; }
+#status { padding: .9rem 1rem; border-left: 3px solid #8be5c3; background: #14241f; font-weight: 650; }
+pre { padding: 1rem; border: 1px solid #344454; border-radius: .65rem; background: #090e15; white-space: pre-wrap; overflow-wrap: anywhere; font: .8rem/1.7 ui-monospace, monospace; }
+[hidden] { display: none !important; }

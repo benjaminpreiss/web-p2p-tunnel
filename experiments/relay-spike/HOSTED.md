@@ -2,11 +2,23 @@
 
 ## Status
 
-The USB-delivered mobile-browser LAN/MASQUE echo passed. This next gate removes
-USB and local HTTP metadata delivery. Static input/export tests pass; hosted-mode
-Rust compilation and a real Irys upload/browser run remain **unverified**.
-No upload, wallet operation, payment, VPS deployment or public relay allocation
-has been performed for this gate.
+**Baseline PASSED**, based on the user's hosted phone-browser and final helper logs.
+The subsequent Vite/TypeScript migration has passed local build/boot checks, but
+still needs this real-phone acceptance test repeated on its new publication.
+The real Irys HTTPS page loaded shared PQ WASM, authenticated the publisher, and
+matched a **25-byte encrypted echo** using the hosted LAN helper mode (no local
+HTTP metadata server or ADB delivery).
+
+Final bridge accounting:
+
+- Relay → listener: **27 packets / 7,809 bytes**.
+- Listener → relay: **27 packets / 8,944 bytes**.
+- Rejected source packets: **0**.
+
+The user completed Irys funding/publication and rebuilt the native helper before
+this test. No VPS relay or cellular/NAT traversal is established. The acceptance
+steps below describe how to repeat the bounded LAN test; private addresses and
+session descriptors are not retained here.
 
 ## Shape
 
@@ -37,20 +49,21 @@ private IPv4/port scope; it does not replace cryptographic pin validation.
 bash experiments/relay-spike/hosted.sh build
 ```
 
-Runs JS input tests and TypeScript export tests, the Rust tests/build, and exports:
+Runs TypeScript input/export tests, the Rust tests/build, and Vite, then exports:
 
 ```text
 apps/browser/dist/irys-browser/
   index.html
   app.js
-  hosted-config.mjs
+  style.css
   pkg/relay_crypto.js
   pkg/relay_crypto_bg.wasm
 ```
 
 All asset references are relative to their containing document/module, rather
-than hard-coded gateway/CDN hosts. The export changes only the HTML fixture-mode
-marker; local desktop/USB modes use the same frontend with their local config.
+than hard-coded gateway/CDN hosts. Vite bundles the TypeScript UI and emits CSS. The export changes only the HTML
+fixture-mode marker between the hosted bundle and `apps/browser/dist/local-browser/`;
+local desktop/USB modes use that local bundle with their guarded HTTP config.
 The exporter uses an explicit five-file allowlist, refuses unexpected files in
 an existing output folder, and never copies session JSON, logs or keys. It writes
 local SHA-256 checksums **outside** the upload folder to `dist/irys-browser.SHA256SUMS`.

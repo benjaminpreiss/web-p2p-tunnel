@@ -1,53 +1,110 @@
 # Irys browser client
 
-The current browser/PQ echo diagnostic lives here, outside `experiments/`.
-The native terminal helper and MASQUE fixture remain in `experiments/relay-spike/`.
-The older `web/` directory is unrelated legacy code.
+A **Vite + vanilla TypeScript + CSS** client, with no UI framework, remote fonts,
+or browser-side wallet dependencies. The existing Saorsa PQ/WebRTC flow is retained.
+The native terminal helper remains in `experiments/relay-spike/`; `web/` is unrelated
+legacy code. The pre-migration hosted phone echo passed; this migrated version
+still needs a repeat of that real-phone acceptance test.
 
-This is still native JavaScript/HTML/CSS, **not yet a Vite app**. Build/export tools
-are TypeScript, executed by Node 24 without an extra runtime or Python. Vite and
-frontend TypeScript migration are separate follow-up work.
+## Install and build (repository root, normal terminal)
 
-## Build (repository root, normal terminal)
-
-Requires Node 24, Rust stable, the `wasm32-unknown-unknown` target, and `wasm-pack`
-on PATH. CI installs these tools separately.
+Requires Node 24, Rust stable, `wasm32-unknown-unknown`, and `wasm-pack` on PATH.
 
 ```sh
+npm ci --prefix apps/browser --ignore-scripts
 npm --prefix apps/browser run build
 ```
 
-`build.ts` builds release PQ WASM from `crypto/` with the committed Cargo lockfile.
-It remaps local home, toolchain, dependency and repository paths so compiler
-panic/debug strings do not disclose personal paths. Raw `wasm-pack` invocations
-without these mappings should not be used for publishable assets.
+The build has three steps:
 
-`export.ts` prepares `dist/irys-browser/` using an explicit five-file allowlist,
-changes the HTML marker to hosted mode, checks WASM, rejects embedded user-home
-paths and symlinks, and refuses unexpected existing output files. Checksum output
-is beside the folder, not inside it. Nothing is uploaded or funded by this build.
-Generated `pkg/`, `crypto/target/` and `dist/` are Git-ignored.
+1. `build.ts` builds release PQ WASM from the locked `crypto/` crate. It remaps
+   identifying home, toolchain, dependency and repository paths in Rust output.
+2. Vite type-checks/bundles `src/app.ts`, minifies JS/CSS, and emits an intermediate
+   `dist/frontend/` folder. `base: "./"` keeps URLs manifest-relative. An explicit
+   plugin copies only the generated crypto JS/WASM, after privacy/size/path checks.
+   `publicDir` is disabled: arbitrary static files are never automatically copied.
+3. `export.ts` validates and prepares both bundles:
+   - **`dist/irys-browser/`**: hosted mode, descriptor paste, no local metadata fetch.
+   - **`dist/local-browser/`**: local helper mode, retaining guarded session/counter APIs.
 
-Regenerate only the static folder, using existing safe WASM:
+Each bundle contains exactly:
 
-```sh
-npm --prefix apps/browser run export
+```text
+index.html
+app.js
+style.css
+pkg/relay_crypto.js
+pkg/relay_crypto_bg.wasm
 ```
 
-Previously generated local WASM contained identifying build paths and was removed.
-A fresh build is required before exporting or serving local browser fixtures.
+The configuration parser is bundled into `app.js`; it is no longer a separate
+`hosted-config.mjs` asset. There are no source maps or inlined WASM. The generated
+crypto module remains external so its sibling WASM resolution stays unchanged.
+The app locates that module relative to the document's manifest URL.
+
+On the first migration build, an old output folder may still contain the obsolete
+`hosted-config.mjs`. The exporter deliberately refuses unexpected files instead
+of silently deleting them. Review and remove only the obsolete generated output
+(or the generated `apps/browser/dist/` directory), then rebuild.
+
+The exporter rejects symlinks, unexpected output, invalid WASM and embedded user
+home paths, and writes SHA-256 checksums outside the upload folder. Raw wasm-pack
+invocations without path remapping should not be used for publishable assets.
+Builds never upload or fund anything. Generated assets and dependencies are ignored.
+
+## Frontend iteration (existing WASM required)
+
+```sh
+npm --prefix apps/browser run dev
+npm --prefix apps/browser run build:frontend
+npm --prefix apps/browser run preview
+```
+
+`dev` provides the descriptor-paste UI on loopback. `preview` serves the hosted
+production bundle on loopback. Neither starts a relay, supplies session metadata,
+or makes an insecure LAN URL safe for phone WebRTC. Use the deployed HTTPS page
+for phone acceptance; do not weaken browser security or bind dev servers publicly.
+`build:frontend` reuses generated `pkg/` assets and does not invoke Cargo.
+`npm --prefix apps/browser run export` only re-exports a previously built Vite
+intermediate folder; it does not rebuild stale source code.
 
 ## Checks
 
 ```sh
+npm --prefix apps/browser run typecheck
 npm --prefix apps/browser test
+npm --prefix apps/browser run test:bundle
+```
+
+Browser type checking requires the generated WASM declarations. `test:bundle`
+requires built output and executes minified app code plus real PQ WASM with a
+minimal browser-API harness at a nested HTTPS manifest path. It verifies hosted
+startup makes only crypto-asset requests, local startup additionally fetches
+session metadata, and neither connects automatically. It does **not** test visual
+rendering, real browser security policy, or actual WebRTC/PQ echo connectivity.
+The VM-module flag is for Node tests only.
+
+Node build/export tools and tests are also checked by the publisher's TypeScript
+configuration. Install both projects before running that aggregate check:
+
+```sh
+npm ci --prefix deployment/irys --ignore-scripts
 npm --prefix deployment/irys run typecheck
 ```
 
-The second command requires `npm ci --prefix deployment/irys --ignore-scripts`;
-its TypeScript configuration also checks the browser build/export tools and tests.
-No wallet is needed for checks, builds, or exports. Do not add session descriptors,
-wallet files, logs or local environment files to the upload bundle.
+Frontend and publisher dependency trees are separate. The frontend dependency
+scan was clean at migration time; that does not resolve the publisher SDK's
+previously documented advisories.
+
+## Acceptance and deployment
+
+Rebuild local helpers with `bash experiments/relay-spike/hosted.sh build`; local
+HTTP modes now read their generated bundle rather than embedding raw source JS.
+The exact Host/Origin/fetch-site checks are unchanged. Hosted helper mode still
+starts no HTTP server and needs no frontend files to run.
 
 Publication setup: [Irys publisher](../../deployment/irys/README.md).
-Phone/helper acceptance: [hosted gate](../../experiments/relay-spike/HOSTED.md).
+After a reviewed PR merges and CI publishes, repeat the
+[phone/helper acceptance test](../../experiments/relay-spike/HOSTED.md): fresh
+trusted descriptor, authenticated 25-byte echo, and bidirectional terminal bridge
+counters. Do not infer mobile success from the offline boot harness alone.

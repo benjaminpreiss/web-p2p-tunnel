@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { hostedConfiguration } from "../hosted-config.mjs";
+import { hostedConfiguration } from "../src/hosted-config.ts";
 
 // Synthetic addresses only, not recorded endpoints. Cryptographic validation belongs to Rust/WASM.
 const suffix = `/webrtc-direct/certhash/u${"A".repeat(48)}/p2p/${"a".repeat(64)}`;
@@ -21,5 +21,5 @@ test("rejects remote URLs, public/loopback targets, invalid ports, and malformed
     `/ip4/10.0.0.999/udp/49623${suffix}`, `/ip4/10.0.0.1/udp/0${suffix}`,
     `/ip4/10.0.0.1/udp/65536${suffix}`, `${descriptor}\n${descriptor}`,
     descriptor.replace("/p2p/", "/wrong/"),
-  ]) assert.throws(() => hostedConfiguration(input), undefined, String(input));
+  ]) assert.throws(() => hostedConfiguration(input), Error, String(input));
 });

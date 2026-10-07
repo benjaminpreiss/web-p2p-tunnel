@@ -7,8 +7,9 @@ Last updated: 2026-10-07.
 The user returned to **a website on Irys (`irys.xyz`) as the mobile client** and
 **a computer helper run from a terminal**. Keep the pinned Saorsa MASQUE relay
 approach rather than switching to TURN. The user now requested replacing GitHub
-Pages with an Irys publishing workflow paid in USDC. Wallet/CI setup and the first
-publication remain pending; no VPS deployment is authorized.
+Pages with an Irys publishing workflow paid in USDC. The user has now completed
+funding, publication, and the hosted phone-browser LAN echo gate. No VPS deployment
+is authorized.
 
 - Browser-side networking remains WebRTC plus the shared application-level PQ
   session. A browser does not become a native MASQUE/QUIC client just because
@@ -18,9 +19,9 @@ publication remain pending; no VPS deployment is authorized.
 - Direct-first selection with relay fallback is a bandwidth-saving goal, not
   implemented/proven behavior. On a relayed path, all tunneled application data
   traverses the relay. Serve public frontend assets directly from Irys.
-- Phone browser compatibility, deployed Irys behavior, real NAT traversal,
-  authorization, bounded HTTP/WebSocket forwarding and production relay operation
-  remain to be validated. Existing research should be reused.
+- Irys asset delivery and one phone-browser LAN/PQ echo are validated. Broader
+  browser compatibility, real NAT traversal, authorization, bounded HTTP/WebSocket
+  forwarding and production relay operation remain unvalidated.
 - Browser networking still depends on that browser's device-policy permissions;
   the website is not a bypass for Restricted networking mode.
 
@@ -30,6 +31,71 @@ cancelled. At the user's request, `experiments/android-app`,
 including their build artifacts and pending staged additions. Android paths and
 commands further below are historical records, not runnable checkout instructions.
 Do not resume those experiments. See `VISION.md` for the current scope.
+
+### Current gate: Vite + vanilla TypeScript migration — built, live recheck pending
+
+- UI source moved to `apps/browser/src/app.ts`, `hosted-config.ts`, and `style.css`.
+  Vite 8.3.3 is pinned with a frontend npm lockfile. No UI framework, web fonts,
+  wallet SDK, telemetry, or persistence was added to the browser.
+- The SDP/PQ/WebRTC flow, limits and one-attempt behavior are retained. Runtime
+  checks now validate local JSON shapes; the generated WASM declarations type-check
+  the crypto calls. The UI uses responsive CSS and accessible native controls.
+- Vite emits an intermediate folder with relative paths, minified JS/CSS, no source
+  maps or inlined WASM. The configuration parser is bundled. The strict upload
+  allowlist now contains `index.html`, `app.js`, `style.css`, and the two `pkg/`
+  crypto assets; `hosted-config.mjs` is no longer an output file.
+- Exporter prepares separate `dist/irys-browser/` and `dist/local-browser/` bundles.
+  The Rust local HTTP fixture now reads the built local bundle; its Host/Origin/
+  fetch-site guard is unchanged. Hosted helper mode still starts no HTTP server.
+- CI installs both locked Node projects, rebuilds release WASM, builds/types-checks
+  the Vite frontend and runs its boot smoke checks before publication. Merge-only
+  publication, explicit manual funding and wallet isolation are unchanged.
+- Validation: both TypeScript checks, 12 publisher tests, 8 frontend/export tests,
+  and 3 built-bundle checks passed (two startup tests plus the publisher allowlist
+  check). Startup tests execute minified app code and real WASM at a synthetic
+  nested HTTPS manifest URL using minimal browser stubs;
+  they verify expected requests and no automatic connection. They do not replace
+  rendering, browser-security, or real WebRTC testing.
+- Frontend build reused existing local WASM: HTML 2,097 bytes; app JS 10,322 bytes;
+  CSS 1,773 bytes; crypto glue 17,484 bytes; WASM 1,271,649 bytes. This is not a claim
+  about the next CI release-WASM size or gateway compression. Frontend npm audit
+  reported zero advisories; publisher SDK advisories remain separate.
+- Rust formatting and shell syntax passed. The changed native asset loader still
+  needs compilation in the user's normal terminal. Nothing new was uploaded,
+  funded or deployed by the agent. Repeat hosted-phone acceptance after publication.
+
+Build/check commands: `apps/browser/README.md`. If an older generated output folder
+still has `hosted-config.mjs`, review and remove that obsolete output before export;
+unknown output files are deliberately not deleted by the exporter.
+
+### Baseline gate: Irys-hosted phone-browser LAN echo — PASSED
+
+The user supplied successful publication, browser and final helper logs:
+
+- All five website assets plus the index manifest uploaded to Irys. The reported
+  per-item price quotes total 1,880 atomic USDC (0.001880 USDC); this is not an
+  independent measurement of actual debits or SOL funding fees.
+- Desktop and phone browsers loaded the real HTTPS gateway/CDN page and shared
+  PQ WASM. Hosted mode used no localhost metadata fetches or ADB delivery.
+- Phone Chrome opened the WebRTC DataChannel, authenticated the publisher through
+  the Saorsa PQ session, and matched a **25-byte encrypted echo**.
+- The selected ICE pair used UDP, local `prflx`, remote `host`, and the advertised
+  private-LAN MASQUE allocation. Forwarding is external to browser ICE.
+- Final relay → listener counters: **27 packets / 7,809 bytes**.
+- Final listener → relay counters: **27 packets / 8,944 bytes**.
+- Rejected source packets: **0**. Helper shutdown completed normally after the
+  browser reported PASS. Both application verification and relay accounting passed.
+- An initially stale helper binary lacked `browser-hosted`; the user rebuilt it
+  before this successful run. The source/build path is now exercised locally.
+
+Private addresses, session descriptor and browser fingerprint are intentionally
+not retained here. This proves the bounded hosted-page LAN path, **not** cellular/
+home NAT traversal, a public VPS relay, direct-first fallback, visitor authorization,
+HTTP/WebSocket forwarding, or Service Worker routing. The relay/helper still run
+on the same computer. This pass predates the Vite migration described above.
+
+The preparation notes below record earlier stages and should not be read as the
+current validation status.
 
 ### Browser relocation, privacy cleanup, and TypeScript export
 
@@ -638,7 +704,7 @@ checkout will need that build. Retain both native and WASM Cargo lockfiles.
 - `experiments/relay-spike/src/main.rs`: native diagnostic, CLI and endpoint setup.
 - `experiments/relay-spike/src/bridge.rs`: bounded, throwaway UDP/MASQUE adapter.
 - `experiments/relay-spike/src/browser.rs`: local browser fixture and fixed HTTP routes.
-- `apps/browser/app.js`, `index.html`: diagnostic browser UI.
+- `apps/browser/src/app.ts`, `src/style.css`, `index.html`: Vite/TypeScript diagnostic UI.
 - `apps/browser/crypto/`: separate WASM crate, sharing upstream
   SDP synthesis and `PqClientHandshake`/`PqSession` rather than JS cryptography.
 

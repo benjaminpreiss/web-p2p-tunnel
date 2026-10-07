@@ -3,17 +3,19 @@
 **Resume here:** [project status](../../docs/STATUS.md).
 Current direction: an Irys-hosted browser client, terminal computer helper, and
 pinned Saorsa MASQUE relay path. Android app and SSH development are cancelled.
-The local desktop experiments and phone-browser LAN mode passed. The phone
-result uses USB for frontend delivery, not an Irys-hosted deployment.
+The local desktop, USB-delivered phone-browser and now **Irys-hosted phone-browser
+LAN tests have passed**.
 
-**Next gate:** [static Irys-hosted page, no USB](HOSTED.md). The static bundle and
-no-HTTP/ADB helper mode are prepared. JS/export tests passed; updated Rust
-compilation and a real Irys upload/browser run remain pending. Nothing has been
-published or paid for. Build with `bash experiments/relay-spike/hosted.sh build`
-from the repository root.
+**Latest result:** [static Irys-hosted page, no USB](HOSTED.md). The hosted phone
+page loaded PQ WASM, authenticated the publisher and matched a 25-byte encrypted
+echo. Final counters: relay → listener **27 packets / 7,809 bytes**, listener →
+relay **27 packets / 8,944 bytes**, **zero rejected sources**. The user completed
+publication and rebuilt the helper before this run. Build with
+`bash experiments/relay-spike/hosted.sh build` from the repository root.
 
 **Throwaway diagnostic, not the production tunnel.** This does not forward HTTP,
-expose a localhost application, publish a website, or contact public relay peers.
+expose a localhost application or contact public relay peers. The separate Irys
+workflow publishes the static diagnostic website, not a tunneled application.
 The existing Go tunnel is unchanged.
 
 ## Question
