@@ -132,6 +132,20 @@ published page; successful upload receipts alone are not browser acceptance.
   require checking secret format/limits; quote/balance errors require checking
   credit; RPC/SDK errors require checking provider and bundler availability.
 
+### Signing-stage failure fixed: Irys L1 transaction IDs
+
+The initial uploader incorrectly required 43-character base64url-style IDs. The
+pinned Irys SDK instead returns base58-encoded 32-byte hashes, commonly 44
+characters. That rejected valid signed items before price quotes or funding;
+`startingBalanceAtomicUsdc: "0"` was not the cause. Validation now checks the base58
+alphabet and decoded byte length, and an offline test prepares/verifies real SDK
+items with a fixed public test seed and anchor. Tests run with `--no-addons`, like
+publication. The test never funds, uploads, or reads a user wallet.
+
+Reports now distinguish preparing signed items from fetching price quotes. The
+funding warning is emitted only if the script reached a funding attempt. A zero
+Irys credit balance is normal before the initial manual top-up.
+
 ## SDK dependency caveat
 
 An npm audit found transitive advisories in the current official SDK. A patched

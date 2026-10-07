@@ -61,7 +61,25 @@ Do not resume those experiments. See `VISION.md` for the current scope.
   new privacy-safe WASM bundle has been built. Run `npm --prefix apps/browser run
   build` in the normal terminal, or use the CI build with publishing disabled.
 
-### Irys CI publisher: implemented, not enabled or live-tested
+### First manual funding run: signing failure reproduced and fixed locally
+
+The user's run connected to the USDC bundler and read zero prepaid Irys credit,
+then failed before any prepared items, quote events or funding attempt. An offline
+real-SDK test reproduced the error: the uploader required 43-character IDs, but
+Irys L1 returns base58-encoded 32-byte hashes (the fixture produces 44 characters).
+The signature was valid and the ID was stable; this was our validator, not the
+wallet balance or the native-addon fallback. Validation now enforces base58 and
+32 decoded bytes. The new fixed-seed/anchor SDK test verifies file and manifest
+signatures without RPC, wallet access, upload, or funding. It passes with
+`--no-addons`; CI tests now use that flag too. Reports separate signing from
+quoting and warn about transfers only after a funding attempt.
+
+The corrected code still needs to reach `main` and pass a fresh manual funding
+run. No funding/upload was performed by the agent. Earlier notes about no CI
+setup below describe the pre-setup state; the user has now configured GitHub and
+run the workflow.
+
+### Irys CI publisher: implementation and earlier setup notes
 
 - Removed `.github/workflows/pages.yaml`; added `.github/workflows/irys.yaml`.
   Builds release PQ WASM and the current five-file diagnostic website, not the

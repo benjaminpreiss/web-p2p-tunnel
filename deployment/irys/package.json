@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --test *.test.ts",
+    "test": "node --no-addons --test *.test.ts",
     "publish:site": "node --no-addons publish.ts"
   },
   "engines": { "node": ">=24" },

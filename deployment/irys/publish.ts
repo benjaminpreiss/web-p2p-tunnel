@@ -86,11 +86,12 @@ async function main() {
   }
   report.wallet = irys.address;
   report.startingBalanceAtomicUsdc = atomic(await irys.getBalance()).toString();
-  stage = "signing and quoting";
+  stage = "preparing signed items";
   const plan = await preparePublication(irys, assets);
   report.items = plan.map(({ path, id, bytes }) => ({ path, id, bytes }));
   report.status = "prepared";
   save();
+  stage = "price quotes";
   const id = await publishPrepared(irys, plan, {
     maxUpload, maxFund, fundTo, fundOnly,
     record: async (event) => {
@@ -128,6 +129,10 @@ main().catch(() => {
   report.failedStage = stage;
   save();
   console.error(`Publication failed during ${stage}. See the public report and deployment/irys/README.md.`);
-  console.error("If funding started, inspect wallet history and Irys credit before retrying: a transfer may already have been sent.");
+  if (report.events.some((event) => event.type === "funding-started")) {
+    console.error("Funding was attempted. Inspect wallet history and Irys credit before retrying: a transfer may already have been sent.");
+  } else {
+    console.error("No wallet funding was initiated by this run. Any completed uploads are listed in the public report.");
+  }
   process.exitCode = 1;
 });
