@@ -11,5 +11,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["*.ts", "../../apps/browser/*.ts", "../../apps/browser/tests/*.ts", "../../apps/browser/smoke/*.ts"]
+  "include": ["*.ts", "../../apps/browser/*.ts", "../../apps/browser/tests/*.ts", "../../apps/browser/smoke/*.ts", "../../apps/browser/fixtures/*.ts"]
 }

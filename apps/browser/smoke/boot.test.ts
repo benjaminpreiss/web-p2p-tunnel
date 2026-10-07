@@ -47,6 +47,8 @@ for (const mode of ["hosted", "local"] as const) {
     const elements = new Map<string, Element>([
       ["#status", status], ["#log", output], ["#run", button],
       ["#message", new Input()], ["#descriptor", new Textarea()], ["#hosted-connection", new Element()],
+      ["#http-run", new Button()], ["#visitor-token", new Input()], ["#http-paths", new Textarea()],
+      ["#http-results", new Pre()], ["#http-controls", new Element()],
     ]);
     for (const selector of elements.keys()) {
       assert.ok(html.includes(`id="${selector.slice(1)}"`), `Built HTML is missing ${selector}`);
@@ -100,6 +102,9 @@ for (const mode of ["hosted", "local"] as const) {
     assert.equal(button.disabled, false, output.textContent);
     assert.match(output.textContent, /Saorsa PQ WASM loaded/);
     assert.equal(connections, 0);
+    assert.equal(elements.get("#http-controls")!.hidden, mode !== "hosted");
+    assert.equal(elements.get("#http-run")!.disabled, mode !== "hosted");
+    assert.match(html, /id="visitor-token"[^>]*type="password"/);
     assert.deepEqual(requests, [
       glueURL, new URL("pkg/relay_crypto_bg.wasm", page).href,
       ...(mode === "local" ? [new URL("/session.json", page).href] : []),

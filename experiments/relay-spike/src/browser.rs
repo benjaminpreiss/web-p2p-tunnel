@@ -1,6 +1,10 @@
 //! Local browser fixture. Fixed HTTP routes; no arbitrary file or URL proxying.
 
-use crate::{LABEL, MAX_MESSAGE_BYTES, bridge, endpoint, stop};
+use crate::{
+    LABEL, MAX_MESSAGE_BYTES, bridge, endpoint,
+    http_inspector::{self, HttpInspector},
+    stop,
+};
 use anyhow::{Context, Result, ensure};
 use saorsa_pqc::api::sig::ml_dsa_65;
 use saorsa_transport::{
@@ -23,6 +27,7 @@ use tokio::{
     task::JoinSet,
     time::timeout,
 };
+use zeroize::{Zeroize, Zeroizing};
 
 const BROWSER_LIFETIME: Duration = Duration::from_secs(600);
 const MAX_ASSET_BYTES: u64 = 16 * 1024 * 1024;
@@ -79,7 +84,7 @@ fn validate_phone_addresses(relay_ip: Ipv4Addr, phone_ip: Ipv4Addr) -> Result<()
 }
 
 pub async fn run(port: u16) -> Result<()> {
-    run_mode(port, None).await
+    run_mode(port, None, None).await
 }
 
 pub async fn run_phone(port: u16, relay_ip: Ipv4Addr, phone_ip: Ipv4Addr) -> Result<()> {
@@ -97,11 +102,16 @@ pub async fn run_phone(port: u16, relay_ip: Ipv4Addr, phone_ip: Ipv4Addr) -> Res
             phone_ip,
             hosted: false,
         }),
+        None,
     )
     .await
 }
 
-pub async fn run_hosted(relay_ip: Ipv4Addr, phone_ip: Ipv4Addr) -> Result<()> {
+pub async fn run_hosted(
+    relay_ip: Ipv4Addr,
+    phone_ip: Ipv4Addr,
+    http_port: Option<u16>,
+) -> Result<()> {
     validate_phone_addresses(relay_ip, phone_ip)?;
     drop(UdpSocket::bind((relay_ip, 0)).context("relay-ip must belong to this Mac")?);
     run_mode(
@@ -111,11 +121,13 @@ pub async fn run_hosted(relay_ip: Ipv4Addr, phone_ip: Ipv4Addr) -> Result<()> {
             phone_ip,
             hosted: true,
         }),
+        http_port,
     )
     .await
 }
 
-async fn run_mode(port: u16, phone: Option<Phone>) -> Result<()> {
+async fn run_mode(port: u16, phone: Option<Phone>, http_port: Option<u16>) -> Result<()> {
+    let inspector = http_port.map(HttpInspector::new).transpose()?;
     // Hosted mode serves no HTTP routes and needs no local copy of the assets.
     // Local modes fail before opening relay sockets if the WASM build is missing.
     let assets = if phone.is_some_and(|phone| phone.hosted) {
@@ -124,7 +136,17 @@ async fn run_mode(port: u16, phone: Option<Phone>) -> Result<()> {
         Some(Arc::new(Assets::load().await?))
     };
     println!("EXPERIMENT: one browser visitor through a controlled local MASQUE relay");
-    println!("No HTTP application is exposed; only encrypted echo is available.");
+    if let Some(port) = http_port {
+        println!(
+            "OPT-IN HTTP INSPECTOR: only GET http://127.0.0.1:{port}; visitor token required."
+        );
+        println!("Use a test app, not a sensitive local service. GET can have side effects.");
+        println!(
+            "Maximum 16 requests, 4 KiB bodies, 5 seconds per fetch; no redirects or credentials forwarded."
+        );
+    } else {
+        println!("No HTTP application is exposed; only encrypted echo is available.");
+    }
     if let Some(phone) = phone {
         if phone.hosted {
             println!(
@@ -155,7 +177,7 @@ async fn run_mode(port: u16, phone: Option<Phone>) -> Result<()> {
     };
     let counters = Arc::new(bridge::Counters::default());
     let result = tokio::select! {
-        result = timeout(BROWSER_LIFETIME, serve(&relay, &helper, port, phone, assets, Arc::clone(&counters))) => {
+        result = timeout(BROWSER_LIFETIME, serve(&relay, &helper, port, phone, assets, Arc::clone(&counters), inspector)) => {
             result.unwrap_or_else(|_| Err(anyhow::anyhow!("browser fixture expired after 10 minutes; restart it")))
         }
         signal = tokio::signal::ctrl_c() => signal.context("wait for Ctrl-C"),
@@ -164,7 +186,7 @@ async fn run_mode(port: u16, phone: Option<Phone>) -> Result<()> {
     stop("relay", &relay).await;
     println!("Final bridge counters: {}", snapshot(&counters));
     println!(
-        "Browser fixture stopped. The browser page—not this message—reports whether echo passed."
+        "Browser fixture stopped. The browser page reports echo or HTTP results; these counters measure relay traffic."
     );
     result
 }
@@ -176,6 +198,7 @@ async fn serve(
     phone: Option<Phone>,
     assets: Option<Arc<Assets>>,
     counters: Arc<bridge::Counters>,
+    inspector: Option<(HttpInspector, String)>,
 ) -> Result<()> {
     let relay_addr = relay
         .get_endpoint()
@@ -224,15 +247,49 @@ async fn serve(
         &mut tasks,
     )
     .await?;
+    let inspector = inspector.map(|(inspector, mut token)| {
+        println!("\nPRIVATE VISITOR TOKEN — transfer privately; omit from screenshots and diagnostic logs:");
+        println!("{token}");
+        token.zeroize();
+        println!("Only this helper run accepts it; Ctrl-C revokes access. Never paste it into the descriptor field.");
+        inspector
+    });
+    let http_mode = inspector.is_some();
     tasks.spawn(async move {
         let mut connection = listener.accept().await.context("accept browser association")?;
         let channel = connection.accept_data_channel().await?;
-        ensure!(channel.label() == LABEL, "unexpected browser channel label");
-        let hello = channel.receive().await?;
+        let expected_label = if http_mode { http_inspector::LABEL } else { LABEL };
+        ensure!(channel.label() == expected_label, "wrong mode: use the matching echo or HTTP button");
+        let hello = timeout(Duration::from_secs(30), channel.receive()).await??;
+        ensure!(hello.len() <= 16384, "oversized browser handshake");
         let (accept, mut session) = accept_pq_session(&hello, &publisher_id, &public_key, |transcript| {
             dsa.sign(&secret_key, transcript).map(|signature| signature.to_bytes())
         })?;
         channel.send(&accept).await?;
+        if let Some(mut inspector) = inspector {
+            // One authorization record, then at most 16 sequential requests.
+            for _ in 0..17 {
+                let record = match timeout(Duration::from_secs(30), channel.receive()).await? {
+                    Ok(record) => record,
+                    Err(_) => break, // A completed batch may close its DataChannel.
+                };
+                ensure!(record.len() <= 16384, "oversized encrypted inspector record");
+                let request = Zeroizing::new(session.open(&record).context("decrypt inspector request")?);
+                let response = match inspector.handle(&request).await {
+                    Ok(response) => response,
+                    Err(_) => {
+                        // Do not reflect tokens, target URLs or response data into logs.
+                        channel.send(&session.seal(br#"{"v":1,"type":"error"}"#)?).await?;
+                        println!("Inspector access closed: authorization, request, or target response rejected.");
+                        break;
+                    }
+                };
+                channel.send(&session.seal(&response)?).await?;
+            }
+            println!("Inspector finished. No further target access is possible; Ctrl-C for counters.");
+            std::future::pending::<()>().await;
+            return Ok(());
+        }
         let message = session.open(&channel.receive().await?).context("decrypt browser echo request")?;
         ensure!(message.len() <= MAX_MESSAGE_BYTES, "browser message exceeds 8 KiB");
         channel.send(&session.seal(&message)?).await?;
@@ -274,7 +331,9 @@ async fn serve(
         println!(
             "Paste it into the hosted page on the phone. No USB required; stay on the same Wi-Fi."
         );
-        println!("After the page verifies its echo, Ctrl-C here to collect final relay counters.");
+        println!(
+            "Use the matching echo or HTTP inspector button. After verification, Ctrl-C here for final relay counters."
+        );
     }
     println!("One attempt per run. Restart the command before retrying or switching browsers.");
     println!("Use an ordinary browser profile—no special WebRTC flags. Ctrl-C stops everything.\n");

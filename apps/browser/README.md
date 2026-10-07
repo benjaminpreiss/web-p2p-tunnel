@@ -3,8 +3,16 @@
 A **Vite + vanilla TypeScript + CSS** client, with no UI framework, remote fonts,
 or browser-side wallet dependencies. The existing Saorsa PQ/WebRTC flow is retained.
 The native terminal helper remains in `experiments/relay-spike/`; `web/` is unrelated
-legacy code. The pre-migration hosted phone echo passed; this migrated version
-still needs a repeat of that real-phone acceptance test.
+legacy code. Both baseline and migrated Irys-hosted phone echoes passed: publisher
+authentication, a matching 25-byte encrypted echo, and nonzero MASQUE bridge
+traffic in both directions with zero rejected sources. This validates the bounded
+LAN diagnostic, not public-network traversal or a complete localhost web tunnel.
+
+The new **opt-in HTTP inspector** is locally tested but has not yet passed its
+own hosted-phone gate. It requires a fresh private visitor token and fetches a
+bounded batch of GET paths from one explicitly configured localhost port. Results
+are inert text/base64, separate from shareable diagnostics—not transparent app
+rendering. See [HTTP inspector instructions](../../docs/HTTP-INSPECTOR.md).
 
 ## Install and build (repository root, normal terminal)
 

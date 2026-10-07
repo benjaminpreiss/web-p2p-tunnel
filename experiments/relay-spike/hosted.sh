@@ -28,8 +28,13 @@ case "${1:-}" in
         [[ -x target/debug/relay-spike ]] || { echo 'Run hosted.sh build first.' >&2; exit 1; }
         ./target/debug/relay-spike browser-hosted --relay-ip "$2" --phone-ip "$3"
         ;;
+    http)
+        [[ $# == 4 ]] || { echo 'Usage: bash experiments/relay-spike/hosted.sh http <Mac-private-IPv4> <phone-private-IPv4> <localhost-port>' >&2; exit 1; }
+        [[ -x target/debug/relay-spike ]] || { echo 'Run hosted.sh build first.' >&2; exit 1; }
+        ./target/debug/relay-spike browser-hosted --relay-ip "$2" --phone-ip "$3" --http-port "$4"
+        ;;
     *)
-        echo 'Usage: bash experiments/relay-spike/hosted.sh build|bundle|run <Mac-IP> <phone-IP>' >&2
+        echo 'Usage: bash experiments/relay-spike/hosted.sh build|bundle|run <Mac-IP> <phone-IP> | http <Mac-IP> <phone-IP> <localhost-port>' >&2
         exit 1
         ;;
 esac

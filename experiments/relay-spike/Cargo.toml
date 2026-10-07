@@ -10,6 +10,10 @@ blake3 = "1"
 bytes = "1"
 clap = { version = "4", features = ["derive"] }
 hex = "0.4"
+rand = "0.8"
+zeroize = "1"
+base64 = "0.22"
+reqwest = { version = "0.13", default-features = false }
 saorsa-pqc = "=0.5.2"
 saorsa-transport = { git = "https://github.com/WithAutonomi/saorsa-transport", rev = "e2f08388088313c82cac393afa6ca27b9ce00516", default-features = false, features = ["webrtc-direct"] }
 serde = { version = "1", features = ["derive"] }
