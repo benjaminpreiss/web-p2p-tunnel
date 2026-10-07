@@ -1,0 +1,22 @@
+{
+  "name": "web-p2p-irys-publisher",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test *.test.ts",
+    "publish:site": "node --no-addons publish.ts"
+  },
+  "engines": { "node": ">=24" },
+  "devDependencies": {
+    "@types/node": "24.10.0",
+    "typescript": "5.9.3"
+  },
+  "overrides": {
+    "ws@^8.0.0": "8.21.0"
+  },
+  "dependencies": {
+    "@irys/upload": "0.0.15",
+    "@irys/upload-solana": "0.1.8"
+  }
+}
