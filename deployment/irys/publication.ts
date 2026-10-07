@@ -61,7 +61,21 @@ export function atomic(value: AtomicAmount): bigint {
 }
 
 export function transactionId(value: string): string {
-  if (!/^[A-Za-z0-9_-]{43}$/.test(value ?? "")) throw new Error("Invalid Irys transaction ID.");
+  // Irys L1 IDs are base58-encoded SHA-256 hashes, not legacy Arweave
+  // base64url IDs. Validate the decoded 32-byte width, including leading zeros.
+  if (typeof value !== "string" || value.length < 32 || value.length > 44 || /[^1-9A-HJ-NP-Za-km-z]/.test(value)) {
+    throw new Error("Invalid Irys transaction ID.");
+  }
+  const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+  let number = 0n;
+  for (const character of value) number = number * 58n + BigInt(alphabet.indexOf(character));
+  let bytes = 0;
+  while (number > 0n) {
+    bytes++;
+    number >>= 8n;
+  }
+  const leadingZeros = value.match(/^1*/)?.[0].length ?? 0;
+  if (bytes + leadingZeros !== 32) throw new Error("Invalid Irys transaction ID.");
   return value;
 }
 

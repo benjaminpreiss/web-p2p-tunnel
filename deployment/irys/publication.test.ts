@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { FILES, loadSite, preparePublication, publishPrepared, usdc, isMergedMainEvent } from "./publication.ts";
+import { FILES, loadSite, preparePublication, publishPrepared, usdc, isMergedMainEvent, transactionId } from "./publication.ts";
 import type { Publisher, SignedItem } from "./publication.ts";
 
 function fixture(prices = [10n, 20n], initialBalance = 100n) {
@@ -18,7 +18,7 @@ function fixture(prices = [10n, 20n], initialBalance = 100n) {
       data.push(input);
       const index = nextId++;
       const item: SignedItem = {
-        id: String(index).padStart(43, "a"), size: input.length,
+        id: "a".repeat(42) + "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"[index], size: input.length,
         async sign() {},
         async getPrice() { return { toFixed: () => String(prices[index % prices.length] ?? 0n) }; },
         async upload() {
@@ -36,6 +36,18 @@ function fixture(prices = [10n, 20n], initialBalance = 100n) {
   const prepare = () => preparePublication(client, [{ path: "index.html", data: Buffer.from("site"), type: "text/html" }]);
   return { client, prepare, funding, uploads, data, items };
 }
+
+test("Irys IDs are base58 hashes of exactly 32 decoded bytes", () => {
+  for (const id of ["1".repeat(32), "1".repeat(31) + "2", "a".repeat(43)]) {
+    assert.equal(transactionId(id), id);
+  }
+  for (const id of [
+    "", "a".repeat(31), "a".repeat(32), "a".repeat(45), "1".repeat(33), "z".repeat(44),
+    "a".repeat(42) + "_", "a".repeat(42) + "-", "a".repeat(42) + "0",
+    "a".repeat(42) + "O", "a".repeat(42) + "I", "a".repeat(42) + "l",
+    "a".repeat(43) + "\n", "1".repeat(32) + "\n", "1".repeat(32) + "\r\n",
+  ]) assert.throws(() => transactionId(id), /Invalid Irys transaction ID/);
+});
 
 test("publication admits only closed, merged PRs targeting main", () => {
   assert.equal(isMergedMainEvent({ action: "closed", pull_request: { merged: true, base: { ref: "main" } } }), true);
