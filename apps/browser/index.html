@@ -12,7 +12,7 @@
   <p class="eyebrow">WEB P2P <span>LAN DIAGNOSTIC</span></p>
   <h1>Your browser.<br><em>Your connection.</em></h1>
   <p class="route">Browser <span>→</span> MASQUE relay <span>→</span> terminal helper</p>
-  <p>This is a bounded connectivity experiment, not the localhost HTTP tunnel.</p>
+  <p>Bounded encrypted echo and opt-in localhost HTTP inspection—not a production web tunnel.</p>
   <p class="note">Uses your browser's standard WebRTC and Saorsa's Rust/WASM PQ session. No wallet, external STUN server, or public relay is used.</p>
   <p><strong>One attempt per CLI run.</strong> Restart the terminal command before retrying, reloading, or switching browsers.</p>
   <section id="hosted-connection" hidden>
@@ -24,6 +24,21 @@
   <label for="message">Echo message (up to 8 KiB; use no secrets)</label>
   <input id="message" value="hello from a real browser" maxlength="8192">
   <button id="run" disabled>Connect and verify encrypted echo</button>
+  <section id="http-controls" hidden>
+    <h2>Read-only HTTP inspector</h2>
+    <p class="note">Requires a helper started with an explicit HTTP target port. Use a test app: GET requests can have side effects. This does not run the app in your browser.</p>
+    <label for="visitor-token">Private visitor token (not the public descriptor)</label>
+    <input id="visitor-token" type="password" maxlength="64" autocomplete="off" spellcheck="false" autocapitalize="off">
+    <p class="note">Transfer this grant privately from your helper. Never put it in a URL, screenshot, or diagnostics. It is cleared from this field when connecting; stopping the helper revokes access.</p>
+    <label for="http-paths">Paths to fetch, one per line (1–16)</label>
+    <textarea id="http-paths" maxlength="16400" autocomplete="off" spellcheck="false" autocapitalize="off">/
+/style.css</textarea>
+    <p class="note">Only the configured localhost port. Maximum 4 KiB per response, 5 seconds per fetch. No redirects, cookies, caller headers, or arbitrary destinations.</p>
+    <button id="http-run" disabled>Authorize and fetch paths</button>
+    <h2>Private HTTP results — do not share by default</h2>
+    <p class="note">Untrusted content is shown as text or base64, never executed. Nothing here is added to diagnostics or saved by this page.</p>
+    <pre id="http-results"></pre>
+  </section>
   <p id="status" role="status">Loading WASM…</p>
   <h2>Diagnostics — copy this back</h2>
   <pre id="log" aria-live="polite"></pre>

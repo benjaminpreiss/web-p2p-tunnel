@@ -2270,16 +2270,20 @@ name = "relay-spike"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "blake3",
  "bytes",
  "clap",
  "hex",
+ "rand 0.8.8",
+ "reqwest",
  "saorsa-pqc",
  "saorsa-transport",
  "serde",
  "serde_json",
  "tokio",
  "tracing-subscriber",
+ "zeroize",
 ]
 
 [[package]]

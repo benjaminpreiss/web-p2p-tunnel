@@ -4,8 +4,11 @@ The Pages workflow is replaced by `.github/workflows/irys.yaml`. It builds the
 **current PQ/MASQUE browser diagnostic**, not the historical signaling-based
 `web/` application. No real upload, funding transaction, or GitHub environment
 configuration has been performed by the agent. The user has completed the initial
-funding, publication, and hosted-phone LAN echo. The Vite migration is checked
-locally but still needs its own CI publication and real-phone acceptance run.
+funding, publication, and hosted-phone LAN echo. The Vite migration has also
+passed a real Irys-hosted phone echo with bidirectional MASQUE bridge counters.
+The new opt-in HTTP inspector has local test coverage but still needs its own
+phone acceptance run. Release now requires both frontend checks and native helper
+authorization/HTTP tests, in separate jobs without wallet access.
 
 ## Frontend choice
 

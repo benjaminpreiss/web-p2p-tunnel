@@ -1,6 +1,12 @@
 # Local WebRTC-over-MASQUE experiment
 
 **Resume here:** [project status](../../docs/STATUS.md).
+
+**New, local checks only:** [token-authorized HTTP inspector](../../docs/HTTP-INSPECTOR.md).
+Explicitly opt in to one loopback port, then fetch a bounded GET batch from the
+phone. This is not transparent app browsing; a new hosted-phone acceptance run
+is still required. The original echo modes remain available.
+
 Current direction: an Irys-hosted browser client, terminal computer helper, and
 pinned Saorsa MASQUE relay path. Android app and SSH development are cancelled.
 The local desktop, USB-delivered phone-browser and now **Irys-hosted phone-browser
@@ -8,8 +14,9 @@ LAN tests have passed**.
 
 **Latest result:** [static Irys-hosted page, no USB](HOSTED.md). The hosted phone
 page loaded PQ WASM, authenticated the publisher and matched a 25-byte encrypted
-echo. Final counters: relay → listener **27 packets / 7,809 bytes**, listener →
-relay **27 packets / 8,944 bytes**, **zero rejected sources**. The user completed
+echo, including after the Vite/TypeScript migration. Latest counters: relay →
+listener **35 packets / 12,397 bytes**, listener → relay **33 packets / 9,290 bytes**,
+**zero rejected sources**. The user completed
 publication and rebuilt the helper before this run. Build with
 `bash experiments/relay-spike/hosted.sh build` from the repository root.
 

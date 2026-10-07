@@ -2,23 +2,33 @@
 
 ## Status
 
-**Baseline PASSED**, based on the user's hosted phone-browser and final helper logs.
-The subsequent Vite/TypeScript migration has passed local build/boot checks, but
-still needs this real-phone acceptance test repeated on its new publication.
+**Baseline and post-Vite-migration runs PASSED**, based on the user's hosted
+phone-browser and final helper logs. The migrated publication was tested on the
+phone over the same trusted LAN.
 The real Irys HTTPS page loaded shared PQ WASM, authenticated the publisher, and
 matched a **25-byte encrypted echo** using the hosted LAN helper mode (no local
 HTTP metadata server or ADB delivery).
 
-Final bridge accounting:
+Latest (post-migration) bridge accounting:
 
-- Relay → listener: **27 packets / 7,809 bytes**.
-- Listener → relay: **27 packets / 8,944 bytes**.
+- Relay → listener: **35 packets / 12,397 bytes**.
+- Listener → relay: **33 packets / 9,290 bytes**.
 - Rejected source packets: **0**.
 
 The user completed Irys funding/publication and rebuilt the native helper before
 this test. No VPS relay or cellular/NAT traversal is established. The acceptance
 steps below describe how to repeat the bounded LAN test; private addresses and
 session descriptors are not retained here.
+
+## Opt-in HTTP inspection (new, live recheck pending)
+
+`bash experiments/relay-spike/hosted.sh http MAC_LAN_IP PHONE_LAN_IP PORT` selects
+one localhost target and displays a separate private visitor grant. Use the updated
+page's HTTP inspector button; the echo button is a different mode. Never share the
+full terminal transcript containing the grant. See
+[HTTP inspector instructions](../../docs/HTTP-INSPECTOR.md) for the safe test app,
+limits, protocol and phone acceptance steps. The echo pass above does not validate
+this new HTTP mode. Default `hosted.sh run` still exposes no HTTP application.
 
 ## Shape
 

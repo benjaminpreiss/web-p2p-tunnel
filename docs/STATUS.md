@@ -32,7 +32,51 @@ including their build artifacts and pending staged additions. Android paths and
 commands further below are historical records, not runnable checkout instructions.
 Do not resume those experiments. See `VISION.md` for the current scope.
 
-### Current gate: Vite + vanilla TypeScript migration — built, live recheck pending
+### Current work: authorized localhost HTTP inspector — local checks pass, live gate pending
+
+Implemented an opt-in `hosted.sh http MAC_LAN_IP PHONE_LAN_IP PORT` mode and a
+separate browser inspector. It uses the existing PQ/WebRTC/MASQUE path but requires
+a fresh private visitor grant before any target access. Default echo behavior is
+retained. Only GET to one fixed numeric loopback port is allowed: at most 16
+sequential requests, 4 KiB response bodies, and 5 seconds per fetch. No proxy-env
+routing, redirects, caller headers, cookies or automatic decompression. Invalid
+requests consume the attempt. The phone displays inert text/base64, not a running
+web app, and keeps private results out of diagnostic logs.
+
+Native integration tests use actual loopback HTTP fixtures and confirm that failed
+authorization and invalid requests make zero target connections. They also cover
+page/CSS retrieval, redirects, body overflow, deadlines and request limits. Browser
+request-interface tests cover authorization order, response validation, byte
+preservation and text-only rendering. A native-test job now gates Irys release
+alongside the existing frontend build; merge-only publication and wallet isolation
+are unchanged. Validation passed locally: **10 native tests, 15 browser/export
+unit tests, 3 built-bundle checks, and 12 publisher tests (40 total)**, both
+TypeScript checks, the native build/CLI help, and shell/YAML checks. Existing
+privacy-safe WASM was reused unchanged for the local frontend build. These checks
+are not a real phone HTTP-over-WebRTC acceptance run.
+
+Instructions, protocol and limitations: [`HTTP-INSPECTOR.md`](HTTP-INSPECTOR.md).
+The included demo serves only fixed public test content, never repository files.
+No upload/funding/public relay deployment was performed. The prior migrated echo
+pass below remains valid; this new HTTP mode needs its own published-phone test.
+
+### Previous gate: Vite + vanilla TypeScript migration — hosted LAN recheck PASSED
+
+The user supplied the migrated Irys page's mobile-browser PASS and final helper
+counters. HTTPS asset delivery, PQ WASM loading, publisher authentication, and the
+**25-byte encrypted echo** succeeded. Final MASQUE bridge accounting:
+
+- Relay → listener: **35 packets / 12,397 bytes**.
+- Listener → relay: **33 packets / 9,290 bytes**.
+- Rejected source packets: **0**.
+
+This completes the post-migration hosted-phone LAN gate. Counts need not be equal
+between directions; they include protocol traffic, not only application payload.
+Private addresses, session descriptors and browser fingerprints are not retained.
+The relay/helper still run on one computer. Public-relay/NAT traversal, visitor
+authorization, direct-first fallback and actual HTTP/WebSocket forwarding remain
+unproven. Local HTTP fixture asset serving was not separately revalidated by this
+hosted-mode run.
 
 - UI source moved to `apps/browser/src/app.ts`, `hosted-config.ts`, and `style.css`.
   Vite 8.3.3 is pinned with a frontend npm lockfile. No UI framework, web fonts,
@@ -60,9 +104,9 @@ Do not resume those experiments. See `VISION.md` for the current scope.
   CSS 1,773 bytes; crypto glue 17,484 bytes; WASM 1,271,649 bytes. This is not a claim
   about the next CI release-WASM size or gateway compression. Frontend npm audit
   reported zero advisories; publisher SDK advisories remain separate.
-- Rust formatting and shell syntax passed. The changed native asset loader still
-  needs compilation in the user's normal terminal. Nothing new was uploaded,
-  funded or deployed by the agent. Repeat hosted-phone acceptance after publication.
+- Rust formatting and shell syntax passed; the agent did not run Cargo. The user
+  subsequently published and completed the hosted-phone acceptance above. No
+  upload, funding or deployment was performed by the agent.
 
 Build/check commands: `apps/browser/README.md`. If an older generated output folder
 still has `hosted-config.mjs`, review and remove that obsolete output before export;

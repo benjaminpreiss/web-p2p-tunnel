@@ -1,6 +1,7 @@
-//! Throwaway local connectivity diagnostic, not a localhost HTTP tunnel.
+//! Bounded LAN connectivity and opt-in read-only HTTP inspector; not a production tunnel.
 mod bridge;
 mod browser;
+mod http_inspector;
 
 use anyhow::{Context, Result, bail, ensure};
 use clap::{Parser, Subcommand};
@@ -56,12 +57,16 @@ enum Command {
         #[arg(long, default_value_t = 18880)]
         port: u16,
     },
-    /// LAN relay/helper for a separately hosted page; no HTTP server or ADB.
+    /// LAN relay/helper for a separately hosted page; no HTTP listener or ADB.
     BrowserHosted {
         #[arg(long)]
         relay_ip: Ipv4Addr,
         #[arg(long)]
         phone_ip: Ipv4Addr,
+        /// Opt in to token-authorized GET inspection of one 127.0.0.1 port.
+        /// Use a test app: even GET can have side effects. No cookies or redirects.
+        #[arg(long, value_parser = clap::value_parser!(u16).range(1..))]
+        http_port: Option<u16>,
     },
 }
 
@@ -89,9 +94,11 @@ async fn main() -> Result<()> {
             phone_ip,
             port,
         } => browser::run_phone(port, relay_ip, phone_ip).await,
-        Command::BrowserHosted { relay_ip, phone_ip } => {
-            browser::run_hosted(relay_ip, phone_ip).await
-        }
+        Command::BrowserHosted {
+            relay_ip,
+            phone_ip,
+            http_port,
+        } => browser::run_hosted(relay_ip, phone_ip, http_port).await,
     }
 }
 

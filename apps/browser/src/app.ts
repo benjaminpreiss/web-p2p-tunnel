@@ -2,6 +2,7 @@
 import "./style.css";
 import { hostedConfiguration } from "./hosted-config.ts";
 import type { Configuration } from "./hosted-config.ts";
+import { HTTP_LABEL, MAX_REQUESTS, appendHttpResponse, openHttpInspector, validatePath } from "./http-inspector.ts";
 import type { PqEchoClient } from "../pkg/relay_crypto.js";
 
 function element<T extends Element>(selector: string, type: { new(): T }): T {
@@ -17,7 +18,12 @@ const output = element("#log", HTMLPreElement);
 const button = element("#run", HTMLButtonElement);
 const messageInput = element("#message", HTMLInputElement);
 const descriptorInput = element("#descriptor", HTMLTextAreaElement);
+const httpButton = element("#http-run", HTMLButtonElement);
+const tokenInput = element("#visitor-token", HTMLInputElement);
+const pathsInput = element("#http-paths", HTMLTextAreaElement);
+const httpOutput = element("#http-results", HTMLPreElement);
 const hosted = document.documentElement.dataset.fixture === "hosted";
+let attempted = false;
 const started = performance.now();
 
 function log(message: string, details?: unknown) {
@@ -143,20 +149,26 @@ async function candidateSummary(peer: RTCPeerConnection): Promise<Record<string,
   };
 }
 
-async function run(Client: typeof PqEchoClient, configuration: Configuration): Promise<void> {
+async function run(Client: typeof PqEchoClient, configuration: Configuration, http?: { token: string; paths: string[] }): Promise<void> {
+  if (attempted) return;
+  attempted = true;
   button.disabled = true;
+  httpButton.disabled = true;
+  tokenInput.value = "";
+  tokenInput.disabled = true;
+  pathsInput.disabled = true;
   messageInput.disabled = true;
   descriptorInput.disabled = true;
   let cleanupPeer: RTCPeerConnection | undefined;
   let cleanupCrypto: PqEchoClient | undefined;
   try {
-    const message = new TextEncoder().encode(messageInput.value);
+    const message = new TextEncoder().encode(http ? "" : messageInput.value);
     if (message.length > 8192) throw new Error("UTF-8 message exceeds 8 KiB");
     const crypto = new Client(configuration.multiaddr);
     cleanupCrypto = crypto;
     const peer = new RTCPeerConnection({ iceServers: [] });
     cleanupPeer = peer;
-    const channel = peer.createDataChannel(configuration.label, { ordered: true });
+    const channel = peer.createDataChannel(http ? HTTP_LABEL : configuration.label, { ordered: true });
     const inbox = new Inbox(channel);
     peer.addEventListener("iceconnectionstatechange", () => log("ICE state:", peer.iceConnectionState));
     peer.addEventListener("connectionstatechange", () => {
@@ -181,42 +193,62 @@ async function run(Client: typeof PqEchoClient, configuration: Configuration): P
     channel.send(Uint8Array.from(crypto.client_hello()).buffer);
     crypto.authenticate(await inbox.next());
     log("Publisher identity authenticated by Saorsa PQ session");
-    status.textContent = "Checking encrypted echo…";
-    channel.send(Uint8Array.from(crypto.encrypt(message)).buffer);
-    const echoed = crypto.decrypt(await inbox.next());
-    if (echoed.length !== message.length || !echoed.every((byte, index) => byte === message[index])) {
-      throw new Error("Decrypted echo does not match the sent message");
-    }
-    log("PQ-encrypted echo matched:", { bytes: echoed.length });
-    try {
-      log("Selected ICE pair:", await candidateSummary(peer));
-    } catch (error) {
-      log("Optional ICE statistics unavailable:", errorText(error));
-    }
-    if (hosted) {
-      status.textContent = "PASS — authenticated PQ echo; check relay counters in the helper terminal";
-      log("PASS: hosted-page browser authenticated the publisher and matched the encrypted echo");
-      log("Relay accounting is NOT fetched by this static page. After recording these results, Ctrl-C the helper and capture its final bidirectional counters.");
-    } else {
-      const counters = await json("/stats.json");
-      log("Measured helper bridge traffic:", counters);
-      if (!isRecord(counters) || typeof counters.relayToListenerPackets !== "number" ||
-          typeof counters.listenerToRelayPackets !== "number" ||
-          counters.relayToListenerPackets < 1 || counters.listenerToRelayPackets < 1) {
-        throw new Error("Echo matched, but bidirectional relay counters are missing");
+    if (http) {
+      status.textContent = "Authorizing this visitor…";
+      const inspector = await openHttpInspector(async (request) => {
+        channel.send(Uint8Array.from(crypto.encrypt(request)).buffer);
+        return crypto.decrypt(await inbox.next());
+      }, http.token);
+      http.token = "";
+      log("Visitor authorized for bounded localhost GET inspection");
+      for (let index = 0; index < http.paths.length; index++) {
+        status.textContent = `Fetching resource ${index + 1} of ${http.paths.length}…`;
+        const path = http.paths[index];
+        const response = await inspector.get(path);
+        appendHttpResponse(httpOutput, path, response);
+        log("HTTP response received:", { request: index + 1, status: response.status, bytes: response.body.length });
       }
-      status.textContent = "PASS — browser PQ echo through the local MASQUE relay";
-      log("PASS: real browser + PQ echo + measured local relay traffic");
+      status.textContent = "HTTP batch received — inspect private results and terminal relay counters";
+      log("Completed bounded HTTP batch. Content is inert; HTTP status codes do not imply application success.");
+    } else {
+      status.textContent = "Checking encrypted echo…";
+      channel.send(Uint8Array.from(crypto.encrypt(message)).buffer);
+      const echoed = crypto.decrypt(await inbox.next());
+      if (echoed.length !== message.length || !echoed.every((byte, index) => byte === message[index])) {
+        throw new Error("Decrypted echo does not match the sent message");
+      }
+      log("PQ-encrypted echo matched:", { bytes: echoed.length });
+      try {
+        log("Selected ICE pair:", await candidateSummary(peer));
+      } catch (error) {
+        log("Optional ICE statistics unavailable:", errorText(error));
+      }
+      if (hosted) {
+        status.textContent = "PASS — authenticated PQ echo; check relay counters in the helper terminal";
+        log("PASS: hosted-page browser authenticated the publisher and matched the encrypted echo");
+        log("Relay accounting is NOT fetched by this static page. After recording these results, Ctrl-C the helper and capture its final bidirectional counters.");
+      } else {
+        const counters = await json("/stats.json");
+        log("Measured helper bridge traffic:", counters);
+        if (!isRecord(counters) || typeof counters.relayToListenerPackets !== "number" ||
+            typeof counters.listenerToRelayPackets !== "number" ||
+            counters.relayToListenerPackets < 1 || counters.listenerToRelayPackets < 1) {
+          throw new Error("Echo matched, but bidirectional relay counters are missing");
+        }
+        status.textContent = "PASS — browser PQ echo through the local MASQUE relay";
+        log("PASS: real browser + PQ echo + measured local relay traffic");
+      }
     }
-    log("Test mode:", configuration.mode);
-    log("NOT YET PROVEN: other browsers/devices, cellular/home NAT, direct-first fallback, authorization, HTTP forwarding, Service Worker routing.");
+    log("Test mode:", http ? "hosted-http-inspector" : configuration.mode);
+    log("NOT YET PROVEN: other browsers/devices, cellular/home NAT, direct-first fallback, transparent app rendering, WebSockets, Service Worker routing. This is not a production authorization system.");
   } catch (error) {
-    status.textContent = "FAIL — copy diagnostics and terminal output";
+    status.textContent = "FAIL — share diagnostics and final counters only; omit tokens and private content";
     log("FAIL:", errorText(error));
     if (!hosted) {
       try { log("Bridge counters at failure:", await json("/stats.json")); } catch {}
     }
   } finally {
+    if (http) http.token = "";
     cleanupPeer?.close();
     cleanupCrypto?.free();
     log("One attempt per run. Restart the CLI before retrying or switching browsers.");
@@ -236,6 +268,24 @@ async function boot() {
   log("Saorsa PQ WASM loaded");
   if (hosted) {
     element("#hosted-connection", HTMLElement).hidden = false;
+    element("#http-controls", HTMLElement).hidden = false;
+    httpButton.disabled = false;
+    httpButton.addEventListener("click", () => {
+      if (attempted) return;
+      try {
+        const configuration = hostedConfiguration(descriptorInput.value);
+        const paths = pathsInput.value.split("\n").map((path) => path.trim()).filter(Boolean);
+        if (paths.length < 1 || paths.length > MAX_REQUESTS) throw new Error("Choose between 1 and 16 paths");
+        paths.forEach(validatePath);
+        const token = tokenInput.value.trim();
+        if (!/^[a-f0-9]{64}$/.test(token)) throw new Error("Expected the fresh 64-character visitor token");
+        httpOutput.textContent = "";
+        void run(module.PqEchoClient, configuration, { token, paths });
+      } catch (error) {
+        status.textContent = "Check descriptor, token and paths";
+        log("INPUT REJECTED:", errorText(error));
+      }
+    });
     status.textContent = "Ready — paste your helper's fresh public descriptor";
     log("Static hosted mode: no localhost fetches, ADB, telemetry, stored invitation, or automatic connection.");
     log("Browser/device local-network policy still applies. Normal permission prompts are allowed; do not disable browser security.");
