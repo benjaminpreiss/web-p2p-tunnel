@@ -1,5 +1,38 @@
 # web-p2p-tunnel
 
+## Active browser-first implementation
+
+A browser **controller** connects over PQ-protected WebRTC through a pinned
+Saorsa MASQUE relay to a terminal helper, which accesses one configured localhost
+**target application**. The validated milestone is token-authorized, bounded HTTP
+inspection on a phone over LAN—not yet transparent website browsing or a
+production Internet tunnel.
+
+The controller is delivered by an **installed Android static server**: bundled
+HTML/JS/WASM served to Chrome/Brave on phone loopback. Android serves files; the
+browser owns the tunnel. [Build and run](apps/android-controller/README.md).
+
+The Irys publisher, SDK dependencies and deployment workflow have been removed.
+No website upload, wallet, funding, commit or merge is needed to test the current
+working tree through the APK. CI performs build/test checks only.
+
+Start with [current status and verified results](docs/STATUS.md),
+[HTTP inspector instructions](docs/HTTP-INSPECTOR.md), or
+[browser development](apps/browser/README.md). The computer helper is in
+[`experiments/relay-spike/`](experiments/relay-spike/README.md).
+
+Target responses remain inert text. Transparent Service Worker routing,
+application scripts, WebSockets, broader device/NAT compatibility and production
+relay admission are not established. The Android launch button's HTTP 403 is an
+open issue; manual URL entry is the tested path. No public relay deployment is
+authorized. The old native Android tunnel and SSH experiments remain cancelled.
+
+## Legacy Go implementation
+
+**Everything below describes the original, separate `web/`, `cmd/` and
+`internal/` implementation**, not the active browser/MASQUE path above. Its public
+endpoints and historical functionality are not current deployment instructions.
+
 A peer-to-peer HTTP tunnel directly to/from the browser, using WebRTC and a Service Worker. Expose a local web server
 directly to any device with a web browser and Internet connection - no server needed.
 

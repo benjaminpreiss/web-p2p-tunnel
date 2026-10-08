@@ -1,166 +1,94 @@
-# Irys-hosted page gate: static bundle, no USB
+# Manual-descriptor browser LAN gate (no USB)
 
-## Status
+“Hosted” is the helper's existing name for a standalone browser controller with
+manual descriptor entry, not a requirement to host on Irys. The current controller
+is bundled in the Android APK and served on phone loopback. The Irys publisher and
+deployment workflow have been removed. Historical Irys results remain in
+[project status](../../docs/STATUS.md).
 
-**Baseline and post-Vite-migration runs PASSED**, based on the user's hosted
-phone-browser and final helper logs. The migrated publication was tested on the
-phone over the same trusted LAN.
-The real Irys HTTPS page loaded shared PQ WASM, authenticated the publisher, and
-matched a **25-byte encrypted echo** using the hosted LAN helper mode (no local
-HTTP metadata server or ADB delivery).
-
-Latest (post-migration) bridge accounting:
-
-- Relay → listener: **35 packets / 12,397 bytes**.
-- Listener → relay: **33 packets / 9,290 bytes**.
-- Rejected source packets: **0**.
-
-The user completed Irys funding/publication and rebuilt the native helper before
-this test. No VPS relay or cellular/NAT traversal is established. The acceptance
-steps below describe how to repeat the bounded LAN test; private addresses and
-session descriptors are not retained here.
-
-## Opt-in HTTP inspection (new, live recheck pending)
-
-`bash experiments/relay-spike/hosted.sh http MAC_LAN_IP PHONE_LAN_IP PORT` selects
-one localhost target and displays a separate private visitor grant. Use the updated
-page's HTTP inspector button; the echo button is a different mode. Never share the
-full terminal transcript containing the grant. See
-[HTTP inspector instructions](../../docs/HTTP-INSPECTOR.md) for the safe test app,
-limits, protocol and phone acceptance steps. The echo pass above does not validate
-this new HTTP mode. Default `hosted.sh run` still exposes no HTTP application.
-
-## Shape
+## Current validated path
 
 ```text
-Browser -> Irys HTTPS gateway/CDN -> static HTML, JS and PQ WASM
-User pastes fresh public descriptor from their trusted terminal helper
-Browser -> Wi-Fi UDP -> Mac MASQUE allocation -> helper -> PQ echo
+Android APK → phone-local HTTP → Chrome/Brave controller + PQ WASM
+Browser → Wi-Fi WebRTC → pinned MASQUE allocation → computer helper
+    → configured localhost target (only with HTTP mode and a visitor grant)
 ```
 
-The frontend must not fetch `/session.json`, `/stats.json`, or any Mac HTTP URL
-in hosted mode. It has no Service Worker, telemetry, local storage, query-string
-invitation or automatic connection. The descriptor stays in the page's memory;
-it is not included in the upload or placed in a share URL. Browser extensions or
-untrusted page delivery remain outside the protection of the PQ session.
+The APK-local phone HTTP run passed publisher authentication, visitor authorization
+and expected HTTP 200 results (192-byte HTML, 48-byte CSS). Final relay → listener:
+**35 packets / 11,305 bytes**; listener → relay: **35 packets / 10,059 bytes**;
+rejected sources **0**, clean helper shutdown. This is a bounded LAN experiment,
+not transparent app rendering, public relay deployment or cellular/NAT acceptance.
 
-The helper's `browser-hosted` mode starts **no HTTP server** and makes no ADB call.
-It prints the public descriptor for manual transfer. Use a trusted transfer method;
-a substituted descriptor would pin a different helper. The descriptor is public
-address/identity metadata, **not visitor authorization or a bearer access grant**.
+The computer helper's `browser-hosted` mode starts **no HTTP metadata server** and
+makes no ADB call. It prints a fresh public descriptor for manual transfer; the
+HTTP variant also prints a separate private visitor token once. The browser must
+not fetch `/session.json`, `/stats.json` or a computer HTTP URL in this mode. It
+does not store invitations, register a controller worker or connect automatically.
+The Android delivery probe's worker is separate and does not control `/controller/`.
 
-The pinned shared Rust/WASM implementation still performs SDP generation and PQ
-crypto. Frontend validation only checks the expected bounded descriptor shape and
-private IPv4/port scope; it does not replace cryptographic pin validation.
+The descriptor pins the publisher identity; it is **not** visitor authorization.
+Use trusted transfer methods. Page-delivery trust is now in the installed APK and
+its build/update process, not a remote gateway. Loopback alone does not protect
+against hostile apps impersonating the static server on an otherwise-free port.
 
-## Build and export (repository root, user's normal terminal)
+## Build and prepare (repository root)
 
 ```sh
 bash experiments/relay-spike/hosted.sh build
+node apps/android-controller/prepare.ts
 ```
 
-Runs TypeScript input/export tests, the Rust tests/build, and Vite, then exports:
+The first command checks/builds the helper and browser. The second stages the
+existing privacy-safe WASM and freshly built frontend for the Android APK. Follow
+[Android build/run instructions](../../apps/android-controller/README.md), then
+manually open `http://127.0.0.1:18787/controller/` on the phone. The Open button's
+403 remains an unresolved launch issue; do not weaken request guards.
 
-```text
-apps/browser/dist/irys-browser/
-  index.html
-  app.js
-  style.css
-  pkg/relay_crypto.js
-  pkg/relay_crypto_bg.wasm
-```
+The hosting-neutral static export is `apps/browser/dist/hosted-browser/`, with
+exactly five files: `index.html`, `app.js`, `style.css`, `pkg/relay_crypto.js` and
+`pkg/relay_crypto_bg.wasm`. URLs are document/module-relative. The exporter rejects
+unexpected files, symlinks and embedded home paths. Checksums are outside the
+asset folder at `dist/hosted-browser.SHA256SUMS`. They are build checks, not an
+independent browser authentication mechanism. Nothing is uploaded or funded.
 
-All asset references are relative to their containing document/module, rather
-than hard-coded gateway/CDN hosts. Vite bundles the TypeScript UI and emits CSS. The export changes only the HTML
-fixture-mode marker between the hosted bundle and `apps/browser/dist/local-browser/`;
-local desktop/USB modes use that local bundle with their guarded HTTP config.
-The exporter uses an explicit five-file allowlist, refuses unexpected files in
-an existing output folder, and never copies session JSON, logs or keys. It writes
-local SHA-256 checksums **outside** the upload folder to `dist/irys-browser.SHA256SUMS`.
-That file is not an Irys manifest and does not establish independent browser code
-integrity. Generated output is Git-ignored.
+For frontend-only regeneration with existing WASM, `hosted.sh bundle` still works;
+it does not rebuild the native helper. APK delivery additionally needs preparation
+and a new APK install. No commit or merge is needed to test the working tree.
 
-For static-only regeneration with existing WASM assets:
+## HTTP acceptance
+
+Use [HTTP inspector instructions](../../docs/HTTP-INSPECTOR.md) for the fixed-content
+fixture and complete procedure. Both devices must use the same trusted Wi-Fi.
 
 ```sh
-bash experiments/relay-spike/hosted.sh bundle
+# Separate terminal: no repository/filesystem serving.
+node apps/browser/fixtures/http-app.ts 3000
+
+# Helper terminal: replace with the current private addresses.
+bash experiments/relay-spike/hosted.sh http MAC_LAN_IP PHONE_LAN_IP 3000
 ```
 
-This does **not** compile the updated Rust helper.
+On the phone, paste the fresh descriptor and private token separately. Press
+**Authorize and fetch paths**, not echo. Confirm authentication/authorization,
+both expected responses, then Ctrl-C the helper for final counters and clean
+shutdown. Do not share the full terminal transcript containing the token. Close
+the browser controller and stop the Android static server afterward. Stopping
+that file server alone does not revoke an already-open WebRTC connection.
 
-## Publication handoff: deliberate separate step
+## Optional echo-only acceptance
 
-The replacement GitHub Actions workflow is now prepared: see
-[`deployment/irys/README.md`](../../deployment/irys/README.md). It builds release
-WASM and publishes this website to Irys L1 using native USDC on Solana. The publisher
-is TypeScript; environment/wallet setup and the first live run remain pending.
-Before enabling it, review current pricing/retention and SDK dependency risks,
-configure a dedicated wallet, and confirm publication. Use local
-signing; do not paste a seed/private key into chat or put one into the bundle.
-A disposable development signing key is preferable for the first fixture.
+```sh
+bash experiments/relay-spike/hosted.sh run MAC_LAN_IP PHONE_LAN_IP
+```
 
-Upload **the folder** using an Irys folder manifest with `index.html` as its index,
-not five unrelated transaction URLs. Required content types:
+Use a fresh helper run and descriptor, then the **echo** button. Expect publisher
+authentication and a matching 25-byte encrypted echo. Ctrl-C for nonzero traffic
+in both directions and zero rejected sources. Default echo mode cannot fetch the
+target application and does not need a visitor token.
 
-| File | Content-Type |
-| --- | --- |
-| `index.html` | `text/html` |
-| `.js` and `.mjs` | `text/javascript` or `application/javascript` |
-| `.wasm` | `application/wasm` |
-
-Share the resulting `https://gateway.irys.xyz/<manifest-id>/` URL, not a hard-coded
-CDN hostname. Verify redirects and same-origin relative asset resolution on the
-actual deployment. Do not infer successful loading solely from an upload receipt.
-The gateway/CDN is part of the initial code-delivery trust path and may rotate
-origins; persistent browser state or Service Worker scope is not promised here.
-See `../../docs/research/irys-browser-entrypoint.md` for prior primary-source
-research and its limits. No uploader credentials or publication have been set up
-by these scripts.
-
-## Acceptance after publication
-
-1. On the phone, open the gateway URL over normal HTTPS with USB disconnected.
-   Confirm the Diagnostics show secure context, final origin/path, hosted mode,
-   and loaded shared PQ WASM. Stop on MIME/CSP/asset errors; do not disable browser
-   security to force a result.
-2. Keep the phone and Mac on the same trusted Wi-Fi. Confirm their current IPs.
-   Start a fresh helper only once the page is ready. Replace the address placeholders:
-
-   ```sh
-   bash experiments/relay-spike/hosted.sh run MAC_LAN_IP PHONE_LAN_IP
-   ```
-
-3. Paste its complete **PUBLIC CONNECTION DESCRIPTOR** into the page via a trusted
-   transfer method. Only this configured phone IPv4 is admitted by the bridge,
-   then one source port is pinned. Public and loopback target descriptors are
-   deliberately rejected by this LAN-only frontend gate.
-4. Click Connect once. Expected: WebRTC open, authenticated publisher identity,
-   matching encrypted echo, and selected remote ICE address/port matching the
-   printed relay allocation. Normal local-network permission prompts may occur;
-   record them and use only permissions you intentionally grant.
-5. Save the page diagnostics, then Ctrl-C the helper and capture its final bridge
-   counters. Require nonzero packet/byte counts in both directions and the intended
-   phone source in the bridge log. Unlike the USB fixture, the static page cannot
-   independently fetch those counters. It reports echo verification separately
-   from relay-accounting evidence.
-
-The helper expires after ten minutes and accepts one browser echo per run. Start
-fresh and replace the pasted descriptor before reloading, retrying, or switching
-browsers. No USB mapping, app installation, HTTP listener, router change or saved
-helper secret needs cleanup. Retain the publication receipt/URL for reproducible
-results; stopping the helper does not delete published Irys assets.
-
-## What a pass does NOT prove
-
-- Cellular/home NAT traversal or a separately deployed VPS relay: all native
-  relay/helper roles still run on the same Mac.
-- Automatic direct-first path selection or relay bandwidth savings.
-- Visitor authorization, production relay admission, or spoof-resistant source
-  control. The wildcard relay UDP allocation remains LAN-visible; do not port
-  forward it or remove the exact-phone source restriction for an Internet test.
-- HTTP/WebSocket forwarding or transparent web-app compatibility. No actual
-  localhost application is exposed. Service Worker registration/routing is a
-  separate future gate, not part of this static echo.
-- A bypass for device policy. The selected browser still needs network access;
-  HTTPS-hosted page to private-LAN WebRTC may be governed differently from our
-  earlier localhost-origin test.
+The bridge admits exactly the configured phone IPv4, then pins one source port.
+Private, different computer/phone addresses are required. Do not remove these
+restrictions, forward router ports, substitute TURN, bypass device policies, or
+infer public-Internet reachability from this LAN result. Direct-first fallback,
+transparent application navigation and WebSockets remain future work.

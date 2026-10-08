@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Local controller probe</title>
+<style>body{font:17px system-ui;background:#101827;color:#edf3ff;max-width:44rem;margin:auto;padding:24px}button,a{display:block;padding:14px;margin:16px 0;border-radius:8px;background:#b6d4ff;color:#101827}pre{white-space:pre-wrap;overflow-wrap:anywhere}h1{font-size:1.8rem}</style>
+<script src="/probe.js" defer></script></head><body>
+<h1>Phone-local delivery probe</h1>
+<p>This delivery probe is bundled in the installed Android app. The probe itself uses no remote assets, tunnel or visitor token.</p>
+<a href="/controller/">Open bundled tunnel controller</a>
+<p>The controller uses a fresh descriptor and visitor token from your computer helper. Its HTML, JavaScript and PQ WASM are all bundled in this APK. No gateway download is needed.</p>
+<pre id="diagnostics">Starting JavaScript…</pre>
+<button id="register">Register test Service Worker</button>
+<a href="/probe-scope/index.html">Open worker-scope test page</a>
+<button id="cleanup">Unregister test worker</button>
+<p>The worker controls only <code>/probe-scope/</code>, not this page. It does not cache any files.</p>
+<p>Leave the browser foregrounded for a minute, then reload this page to check that the Android server stays alive. Use the Android app’s Stop button afterward.</p>
+</body></html>

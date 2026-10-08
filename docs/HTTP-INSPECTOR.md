@@ -1,9 +1,19 @@
 # Authorized localhost HTTP inspector (experimental)
 
-Implemented and locally tested; **the full Irys → phone → PQ/WebRTC → MASQUE →
-HTTP path still needs a real-phone acceptance run**. The earlier hosted encrypted
-echo is proven, not this new application protocol. This is not transparent app
-browsing, a general proxy, or production authorization.
+**Current delivery:** [APK-bundled controller](../apps/android-controller/README.md)
+served on phone loopback; its complete HTTP gate has passed. Irys publishing has
+been removed. The original hosted-page results below are historical evidence.
+
+**Hosted-phone HTTP forwarding and clean shutdown passed**: publisher
+authentication, visitor authorization, expected HTTP 200 HTML (192 bytes) and CSS
+(48 bytes). Final relay → listener counters were **39 packets / 12,964 bytes**;
+listener → relay **38 packets / 10,278 bytes**; rejected sources **0**. The earlier
+EOF-handling bug was fixed, and the repeated phone run stopped without an error.
+This is not transparent app browsing, a general proxy, or production authorization.
+
+The shutdown fix required only rebuilding the helper, not republishing browser
+assets. The successful rerun used the same Irys page and a fresh descriptor and
+private token. See [status](STATUS.md) for the diagnosis and evidence boundaries.
 
 ## What is exposed
 
@@ -45,15 +55,15 @@ The helper displays a **private visitor token once**, separately from the public
 connection descriptor. This intentional terminal display is sensitive: don't log,
 record, screenshot, or share the full terminal transcript. Transfer both values
 using a trusted private method. Never put the token in a URL, repository, issue,
-chat transcript, build configuration, or Irys upload. The helper retains only its
+chat transcript, build configuration, or bundled assets. The helper retains only its
 hash for authorization; the displayed token and decrypted request buffers are
 explicitly zeroized after use. This is not a promise that all process copies,
 OS/terminal/browser memory or clipboard history are securely erased.
 
-For a hosted phone test, publish this version through the normal reviewed PR merge
-path and open its **new** Irys URL. Existing immutable deployments do not update.
-No additional funding is implied. Local preview can check UI/WASM startup on the
-computer; the full inspector test here requires the separate phone. The guarded
+Prepare and rebuild the Android controller using its linked instructions, start
+its local server, and manually open `http://127.0.0.1:18787/controller/` on the
+phone. No deployment is needed. Computer preview can check UI/WASM startup, but
+the full inspector test here uses the separate phone. The guarded computer-side
 local HTTP fixture remains echo-only.
 
 On the phone:
@@ -126,7 +136,7 @@ cargo +stable test --locked --manifest-path experiments/relay-spike/Cargo.toml
 npm --prefix apps/browser test
 npm --prefix apps/browser run build:frontend
 npm --prefix apps/browser run test:bundle
-npm --prefix deployment/irys run typecheck
+npm --prefix apps/browser run typecheck
 ```
 
 - `experiments/relay-spike/src/http_inspector.rs`: authorization/state/limits and
@@ -141,5 +151,7 @@ URL injection, redirect refusal, Content-Length/chunked overflow, deadlines, and
 request-budget enforcement. Browser tests cover authorization order, response
 validation, unsafe paths, byte preservation, limits and the text-only rendering
 sink. Existing startup smoke tests execute real WASM but do not exercise a full
-live HTTP-over-WebRTC session. CI requires both native checks and the frontend
-build before publication; wallet secrets remain confined to the release step.
+live HTTP-over-WebRTC session. Additional native WebRTC/PQ tests exercise actual
+peer close after a reply: transport EOF ends access without entering PQ decryption,
+while nonempty truncated records still fail. CI runs native checks, the frontend
+build and desktop Android-server tests without deployment or wallet access.

@@ -1,9 +1,13 @@
-# Vision: Irys-hosted browser access to a private web application
+# Vision: browser access to a private web application
 
 ## Current product direction
 
-- A mobile browser opens a website hosted on Irys (`irys.xyz`); no installed
-  mobile app or browser extension is required by this direction.
+- The current mobile controller is delivered from an
+  installed Android app over **phone-local HTTP** to Chrome/Brave. The browser
+  still owns WebRTC/PQ; the Android app is only a static file server, not a native
+  tunnel or WebView. TCP loopback delivery and the APK-bundled controller's
+  authorized bounded HTTP tunnel have passed on the test phone. This moves code
+  delivery trust to the installed APK/build/update path; it does not eliminate trust.
 - A helper runs from a terminal on the computer and exposes one explicitly
   configured local web application to authorized browser clients.
 - Keep the **pinned Saorsa MASQUE relay approach**, not a TURN migration.
@@ -11,22 +15,31 @@
   the existing diagnostic bridges that traffic through the MASQUE relay path.
 - Aim for direct connections when feasible, with a controlled relay as fallback.
   Direct-first path selection is not yet implemented or proven. All tunneled
-  data uses relay bandwidth when the relayed path is selected; public frontend
-  assets should load directly from Irys, outside the tunnel.
-- Production authorization, HTTP/WebSocket behavior, Irys deployment, mobile
-  browser compatibility and real-network traversal remain unvalidated. Preserve
-  pinned identities and end-to-end PQ protection; do not expose arbitrary targets.
+  data uses relay bandwidth when the relayed path is selected. Controller assets
+  come from the APK-local static server, outside the target-app tunnel.
+- APK-local controller delivery and bounded token-authorized HTTP inspection
+  have passed. Irys delivery also passed historically, but its publisher and
+  deployment workflow are now removed. Production authorization, transparent app
+  browsing, WebSockets, broader mobile compatibility and real NAT traversal
+  remain unvalidated. Preserve pinned identities and end-to-end PQ protection;
+  do not expose arbitrary targets.
 - Device restrictions still apply to the browser. A website cannot bypass a
   policy that prevents the browser itself from networking.
 
-The Android app, privileged-system integration and SSH tunneling are cancelled.
+The old native Android tunnel app, privileged-system integration and SSH
+tunneling are cancelled. The separate `apps/android-controller/` static-delivery
+probe is now authorized; it does not restore the old native tunnel experiments.
 The Android app/native/smoke experiment directories were removed at the user's
 request; references to their source and commands below are historical only.
 The remaining sections below are historical context, **not an active backlog**.
 See [STATUS.md](STATUS.md) for verified results and deployment boundaries.
 
-The observed mobile blocker was this test phone's enabled Restricted networking
-mode, not proof that mobile networking is generally unsupported.
+The old APK probes failed at UDP socket creation with Restricted networking mode
+enabled, not proof that mobile networking is generally unsupported. TCP loopback
+HTTP serving by the new phone app has now passed its separate user-run delivery,
+worker and short-lifecycle test. Do not generalize this to other socket types or
+policy exemptions. The browser's hosted WebRTC path and authorized bounded HTTP
+tunneling from the new phone-local controller origin have both passed.
 
 ## Historical product direction
 

@@ -287,7 +287,7 @@ async function boot() {
       }
     });
     status.textContent = "Ready — paste your helper's fresh public descriptor";
-    log("Static hosted mode: no localhost fetches, ADB, telemetry, stored invitation, or automatic connection.");
+    log("Static hosted mode: no automatic session metadata fetches, ADB, telemetry, stored invitation, or automatic connection.");
     log("Browser/device local-network policy still applies. Normal permission prompts are allowed; do not disable browser security.");
     button.disabled = false;
     button.addEventListener("click", () => {

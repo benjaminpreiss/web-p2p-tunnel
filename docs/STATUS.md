@@ -2,14 +2,19 @@
 
 Last updated: 2026-10-07.
 
-## Current direction: Irys-hosted browser client, terminal helper, Saorsa MASQUE
+## Current direction: browser controller, terminal helper, Saorsa MASQUE
 
-The user returned to **a website on Irys (`irys.xyz`) as the mobile client** and
-**a computer helper run from a terminal**. Keep the pinned Saorsa MASQUE relay
-approach rather than switching to TURN. The user now requested replacing GitHub
-Pages with an Irys publishing workflow paid in USDC. The user has now completed
-funding, publication, and the hosted phone-browser LAN echo gate. No VPS deployment
-is authorized.
+**New authorized experiment:** an installed Android app serves bundled controller
+files over phone-local TCP HTTP; Chrome/Brave still owns WebRTC/PQ and the existing
+MASQUE tunnel path. Loopback static delivery and browser worker support passed.
+The APK-bundled controller/WASM has now passed the authorized phone-local-origin
+HTTP tunnel test with clean helper shutdown. See the acceptance gates below.
+**Irys publishing has now been removed at the user's request.** The controller
+is delivered by the installed Android static server; no upload, funding or merge
+is needed for local testing.
+
+The computer helper runs from a terminal. Keep the pinned Saorsa MASQUE relay
+approach, not TURN. No VPS/public relay deployment is authorized.
 
 - Browser-side networking remains WebRTC plus the shared application-level PQ
   session. A browser does not become a native MASQUE/QUIC client just because
@@ -18,21 +23,218 @@ is authorized.
   not as production relay admission or a proven phone/Internet tunnel.
 - Direct-first selection with relay fallback is a bandwidth-saving goal, not
   implemented/proven behavior. On a relayed path, all tunneled application data
-  traverses the relay. Serve public frontend assets directly from Irys.
-- Irys asset delivery and one phone-browser LAN/PQ echo are validated. Broader
-  browser compatibility, real NAT traversal, authorization, bounded HTTP/WebSocket
-  forwarding and production relay operation remain unvalidated.
+  traverses the relay. Controller files come from the APK-local server, outside
+  the application tunnel.
+- Irys and APK-local controller delivery, LAN/PQ echo and token-authorized bounded
+  HTTP inspection are validated on the test phone. Broader browser compatibility,
+  real NAT traversal, production authorization, transparent browsing, WebSockets
+  and production relay operation remain unvalidated.
 - Browser networking still depends on that browser's device-policy permissions;
   the website is not a bypass for Restricted networking mode.
 
-The **Android app**, privileged-system integration, and **SSH tunneling** remain
-cancelled. At the user's request, `experiments/android-app`,
+The old **native Android tunnel**, privileged-system integration, and **SSH
+tunneling** remain cancelled. The newly authorized static-delivery probe is a
+separate role, not a revival of those experiments. At the user's request, `experiments/android-app`,
 `experiments/android-native`, and `experiments/android-smoke` have been removed,
 including their build artifacts and pending staged additions. Android paths and
 commands further below are historical records, not runnable checkout instructions.
 Do not resume those experiments. See `VISION.md` for the current scope.
 
-### Current work: authorized localhost HTTP inspector — local checks pass, live gate pending
+### Next work after the checkpoint
+
+1. Diagnose the app-launched browser HTTP 403 with a minimal request-header
+   comparison; keep guards intact. Manual numeric-loopback navigation works.
+2. Design transparent Service Worker HTTP routing separately from the controller.
+   Different URL paths are not script isolation. Explicitly settle the trusted-
+   target assumption before executing target JavaScript.
+3. Keep larger resources, concurrency, navigation, cookies, redirects and
+   WebSockets out of scope until their protocol/security limits are agreed.
+
+The delivery probe is intentionally retained as a bounded regression diagnostic,
+not a production router. Do not remove its cleanup controls or expand its scope.
+
+Checkpoint cleanup separates the active project from legacy Go instructions in
+the root README, marks earlier status entries as historical, and centralizes APK
+asset loading in `BundledSite` so TCP tests exercise the actual production route/
+size logic. WASM responses are checked byte-for-byte rather than through UTF-8
+replacement decoding. The Android test command now includes strict TypeScript
+checking. Routes, request guards, protocol limits and deployment policy are
+unchanged; the launch-button 403 remains open.
+
+After publisher removal, validation comprises **76 TCP/asset-loader assertions
+plus 34 tests** (3 staging/worker, 4 bundle, 15 browser, 12 native), frontend/tooling/
+Android TypeScript checks and frontend preparation. These pass locally. The phone
+acceptance below predates the behavior-preserving asset-loader extraction; the
+exact cleanup APK still needs a user-run rebuild/smoke check. SDK sandbox
+restrictions are unchanged.
+
+### Publisher removal
+
+Removed the production/devnet publisher source, tests, SDK package/lockfile,
+operator guides and `.github/workflows/irys.yaml`. Removed the installed publisher
+SDK dependency tree. Local `.devnet/` wallets and publication reports were left
+untouched; the root `.gitignore` now excludes the retired `deployment/irys/` tree.
+No wallet contents were read, no funding/upload attempted, and no existing public
+upload or remote GitHub configuration was changed.
+
+Browser builds now emit `dist/hosted-browser/`, with checksums outside it.
+`tsconfig.tools.json` keeps build/test typechecking within the browser project;
+bundle tests no longer import publisher code. Android preparation uses the same
+five-file contract. `.github/workflows/checks.yaml` replaces deployment with
+read-only build/test CI on PRs, main pushes and optional manual checks: no release
+job, protected environment, wallet secret or upload step. The new workflow has
+not yet run remotely. Earlier Irys records below are historical acceptance evidence,
+not a runnable publishing path.
+
+### Current gate: APK-bundled controller and localhost-origin HTTP tunnel — PASSED
+
+The user supplied a successful phone run from
+`http://127.0.0.1:18787/controller/`: secure context, PQ WASM loaded, WebRTC
+DataChannel open, publisher authenticated and visitor authorized. Both fixture
+requests returned HTTP 200 with the expected **192-byte HTML** and **48-byte CSS**.
+Final relay → listener: **35 packets / 11,305 bytes**; listener → relay:
+**35 packets / 10,059 bytes**; rejected sources: **0**. The helper stopped cleanly.
+Private LAN addresses, session descriptors and browser fingerprints are omitted.
+
+This validates APK-local code delivery plus the existing browser-owned LAN tunnel,
+not transparent target rendering, broad device support, cellular/NAT traversal or
+production authorization. The app-launch 403 remains unresolved; manual URL entry
+is the validated path. The earlier Gradle `java.nio` name-shadowing compilation
+error was corrected with explicit `File`/`Files` imports before this successful run.
+
+`node apps/android-controller/prepare.ts` rebuilds the current frontend, reuses
+privacy-safe WASM, and stages exactly the five hosted/manual-descriptor assets
+for the Android APK. Checksums and source fingerprints stay outside APK assets;
+Gradle rejects missing/changed staged files or changed frontend sources. No
+upload, funding or production-workflow change. The installed app serves the
+controller at `http://127.0.0.1:18787/controller/` alongside the delivery probe.
+
+The server retains loopback binding, exact request guards and fixed routes. The
+controller gets a separate CSP permitting same-origin assets and WASM compilation
+(`wasm-unsafe-eval`), not arbitrary script evaluation or remote HTTP fetches.
+The diagnostic worker scope does not cover the controller. The APK does not
+implement UDP, WebRTC, visitor authorization or target forwarding: those remain
+in the existing browser/computer-helper path. Stopping the static server does
+**not** revoke an already-running browser session; stop the computer helper and
+close the controller tab to end access.
+
+Desktop checks passed: **70 TCP assertions, 3 staging/worker tests, 4 bundle checks
+(including actual PQ WASM boot at the loopback controller URL), 15 browser tests**,
+frontend typecheck/build and JS syntax checks. The subsequent user-run updated
+APK build and phone test above validate controller boot and WebRTC with the
+served CSP on this phone. For repeats, use manual URL entry, the bounded fixture
+and a fresh helper grant; check expected contents, counters and clean shutdown.
+Instructions: [`apps/android-controller/README.md`](../apps/android-controller/README.md).
+
+### Completed gate: Android phone-local static delivery — PASSED
+
+The user built/installed the probe and confirmed that manually opening the exact
+numeric loopback URL loaded the bundled page. Service Worker registration and the
+scoped synthetic-response test passed. The user then confirmed the one-minute
+browser-foreground root-page reload, worker cleanup, and failure to connect after
+stopping the Android server. No private session or device identifiers are retained.
+
+**Open issue:** the app-launched browser navigation returned HTTP 403. Manual
+address-bar navigation worked; the exact rejected header remains undiagnosed.
+Keep the request guards intact and use manual navigation for now. This pass does
+not establish real controller/WASM boot or WebRTC from the phone-local origin,
+automatic ten-minute expiry, or long-term background operation.
+
+The first version of `apps/android-controller/` bundled only diagnostic HTML/JS
+and served five fixed routes on `127.0.0.1:18787` from a
+user-started foreground service. No native UDP, WebView, target forwarding,
+credentials or remote downloads. It stops on request or a ten-minute timer.
+Chrome/Brave checks secure-context status, scoped Service Worker installation and
+a synthetic response; a one-minute root-page reload checks background server
+survival. Unregister the worker and stop the service after the test.
+
+The previous Android probes failed at UDP socket creation with Restricted
+networking mode enabled. **Those probes did not test TCP localhost HTTP serving**;
+the separate TCP test above has now passed. No policy changes were requested.
+Browser WebRTC works through the hosted path. The subsequent gate above also
+passed with the real browser controller/WASM delivered by the APK and bounded
+HTTP tunneling from the phone-local browser origin.
+
+Desktop validation: **34 real-TCP assertions and 2 worker-script tests passed**,
+plus JS syntax checks. **APK build/install and phone acceptance were completed by
+the user**; the agent sandbox still cannot read the installed Android SDK.
+For repeat runs, open the standalone project in Android Studio, set Gradle JDK 21,
+and follow
+[`apps/android-controller/README.md`](../apps/android-controller/README.md).
+No production workflow, wallet, device setting or existing browser transport was
+changed. The installed APK would become the controller-delivery trust anchor;
+this does not solve hostile-local-app impersonation or target-script isolation.
+
+## Earlier acceptance history
+
+Irys delivery succeeded at the time of these tests, but its publisher, commands
+and deployment workflow have since been removed. The following entries preserve
+evidence and prior decisions, not active publishing instructions.
+
+### Historical Irys devnet publication and phone HTTP test — PASSED
+
+The user completed devnet publication and supplied a successful phone run from a
+`devnet-1.datasprite-cdn.com` HTTPS origin. PQ WASM loaded; publisher authentication
+and visitor authorization succeeded. The expected fixture HTML and CSS each
+returned HTTP 200 (**192 bytes** and **48 bytes** respectively). Final relay →
+listener counters: **27 packets / 6,720 bytes**; listener → relay: **28 packets /
+9,646 bytes**; rejected sources: **0**. The helper stopped without an error.
+This validates the devnet-hosted bounded LAN HTTP path, not wider NAT traversal,
+transparent app rendering, production authorization or devnet retention guarantees.
+Private addresses, session descriptors, wallet details and browser fingerprints
+are intentionally omitted.
+
+An earlier upload attempt stopped with zero prepaid credit; the reported quote
+was **818,420 lamports (0.000818420 devnet SOL)**, not a measured debit. The user
+subsequently obtained an upload URL. A separate wrong-mode connection was rejected;
+only the fresh successful HTTP-mode attempt above counts toward this pass.
+
+Added an isolated terminal-only devnet publisher so frontend changes can be tested
+without committing, pushing or merging. `npm --prefix deployment/irys run
+publish:devnet` rebuilds current frontend source (reusing existing PQ WASM), checks
+the same five-file/privacy allowlist, and uploads with prepaid **Solana devnet SOL**.
+It never funds implicitly. Separate init/quote/fund commands handle one-time setup
+and explicit credit top-ups. The wallet lives in ignored `.devnet/` storage; default
+Solana wallets, production secrets and mainnet fallback are not used.
+
+Bundler/RPC are fixed; the complete devnet genesis and resolved SDK network/token
+units are checked. Inherited `IRYS_*` variables and CI invocation are rejected.
+Integer publication accounting is shared, with a production adapter preserving
+USDC events and existing semantics. Production's merge-only entrypoint/workflow
+are unchanged. Reports are separate, public and identify lamports, not USDC.
+
+Type checking and **20 publisher tests** pass, including actual SDK offline SOL
+signing, network/credential isolation, funding-only versus upload behavior and
+production report compatibility. Read-only official documentation/metadata/price/
+genesis probes were made by the agent; no user wallet was created/accessed, no
+faucet requested, and no funding or upload was performed by the agent. The later
+user-run publication, asset delivery and phone test are evidenced above. Devnet
+is public and documented as temporary (~60 days); long-term retention was not tested.
+
+Former setup guide: `deployment/irys/DEVNET.md` (removed with the publisher).
+Research: [`research/irys-devnet-preview.md`](research/irys-devnet-preview.md).
+
+### Completed gate: authorized hosted-phone HTTP forwarding and clean shutdown — PASSED
+
+The user supplied the Irys-hosted phone's publisher authentication, visitor
+authorization and expected fixture results: **HTTP 200 / 192-byte HTML** and
+**HTTP 200 / 48-byte CSS**. The clean rerun's final relay → listener accounting:
+**39 packets / 12,964 bytes**; listener → relay: **38 packets / 10,278 bytes**;
+rejected sources: **0**. The helper stopped without an error. This validates the
+bounded authorized HTTP forwarding path and clean shutdown on the LAN.
+Private addresses, descriptor, token and browser fingerprint are not retained.
+
+The first HTTP run had reported `decrypt inspector request` / `encrypted record is
+truncated`. A real loopback WebRTC/PQ exchange reproduced this deterministically
+on explicit peer close: pinned Saorsa's `receive()` returns an empty vector for
+channel close/reset, which our inspector incorrectly passed to PQ decryption.
+The helper now ends access on that documented EOF, before decryption; nonempty
+malformed records and transport errors still fail. Two real-transport regression
+tests exercise the shared production reader after a reply; all **12 native tests
+pass**. This fix changes no browser assets or protocol and needs only a helper
+rebuild. The user then repeated the phone test against the same hosted page with
+a fresh descriptor/grant: both expected responses and clean helper shutdown passed.
+The original error exit is retained here as history, not counted as a clean run.
 
 Implemented an opt-in `hosted.sh http MAC_LAN_IP PHONE_LAN_IP PORT` mode and a
 separate browser inspector. It uses the existing PQ/WebRTC/MASQUE path but requires
@@ -49,16 +251,18 @@ page/CSS retrieval, redirects, body overflow, deadlines and request limits. Brow
 request-interface tests cover authorization order, response validation, byte
 preservation and text-only rendering. A native-test job now gates Irys release
 alongside the existing frontend build; merge-only publication and wallet isolation
-are unchanged. Validation passed locally: **10 native tests, 15 browser/export
+are unchanged. Initial implementation validation passed locally: **10 native tests, 15 browser/export
 unit tests, 3 built-bundle checks, and 12 publisher tests (40 total)**, both
 TypeScript checks, the native build/CLI help, and shell/YAML checks. Existing
-privacy-safe WASM was reused unchanged for the local frontend build. These checks
-are not a real phone HTTP-over-WebRTC acceptance run.
+privacy-safe WASM was reused unchanged for the local frontend build. The subsequent
+live forwarding result and native shutdown regression checks are recorded above.
 
 Instructions, protocol and limitations: [`HTTP-INSPECTOR.md`](HTTP-INSPECTOR.md).
 The included demo serves only fixed public test content, never repository files.
 No upload/funding/public relay deployment was performed. The prior migrated echo
-pass below remains valid; this new HTTP mode needs its own published-phone test.
+pass below remains valid. Both HTTP forwarding and the shutdown fix are now
+validated on the hosted-phone LAN path. Broader browser compatibility, public
+relay/NAT traversal, transparent app rendering and WebSockets remain unproven.
 
 ### Previous gate: Vite + vanilla TypeScript migration — hosted LAN recheck PASSED
 
@@ -141,6 +345,13 @@ on the same computer. This pass predates the Vite migration described above.
 The preparation notes below record earlier stages and should not be read as the
 current validation status.
 
+## Historical implementation notes
+
+The following entries record the state **at each earlier milestone**. Statements
+such as "pending" or "next" below are historical, not today's backlog; use the
+current gates and next-work list above. Deleted Android commands must not be
+revived.
+
 ### Browser relocation, privacy cleanup, and TypeScript export
 
 - Browser sources, PQ WASM crate and tests now live in `apps/browser/`.
@@ -221,7 +432,7 @@ run the workflow.
   Setup: `deployment/irys/README.md`; primary sources:
   `docs/research/irys-ci-publication.md`. Never ask for wallet secrets in chat.
 
-### Current next gate: static Irys frontend without USB (prepared, not deployed)
+### Historical gate: static Irys frontend without USB (then prepared, not deployed)
 
 Added `experiments/relay-spike/hosted.sh` and `HOSTED.md` for the next gate:
 

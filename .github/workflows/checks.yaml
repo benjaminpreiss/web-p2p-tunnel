@@ -1,0 +1,59 @@
+name: Build and test
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-checks:
+    name: Check helper authorization and HTTP limits
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Test native helper (loopback fixtures)
+        run: |
+          rustup toolchain install stable --profile minimal
+          cargo +stable test --locked --manifest-path experiments/relay-spike/Cargo.toml
+
+  browser-checks:
+    name: Check browser and Android static assets
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/browser/package-lock.json
+      - name: Install browser dependencies without lifecycle scripts
+        run: npm ci --prefix apps/browser --ignore-scripts
+      - name: Install WASM build tools
+        run: |
+          rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown
+          cargo +stable install wasm-pack --version 0.13.1 --locked
+      - name: Build privacy-safe WASM and stage APK assets
+        env:
+          RUSTUP_TOOLCHAIN: stable
+        run: |
+          node apps/browser/build.ts --release
+          node apps/android-controller/prepare.ts
+      - name: Check browser and exporter
+        run: npm --prefix apps/browser test
+      - name: Check actual static server, asset loader and bundle boot (not an APK build)
+        run: JAVA_HOME="$JAVA_HOME_17_X64" bash apps/android-controller/test-server.sh

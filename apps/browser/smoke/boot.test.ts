@@ -1,20 +1,21 @@
 // Executes the built app and real WASM in a minimal browser-API harness.
 // This checks startup/asset routing, not rendering or real WebRTC connectivity.
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createContext, SourceTextModule } from "node:vm";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
-import { loadSite } from "../../../deployment/irys/publication.ts";
+import { FILES, readAsset } from "../export.ts";
 
-test("Vite hosted output satisfies the publisher allowlist; local output cannot publish", () => {
-  const hosted = fileURLToPath(new URL("../dist/irys-browser/", import.meta.url));
-  const local = fileURLToPath(new URL("../dist/local-browser/", import.meta.url));
-  const assets = loadSite(hosted);
-  assert.equal(assets.length, 5);
-  assert.equal(assets.find((asset) => asset.path === "style.css")?.type, "text/css; charset=utf-8");
-  assert.throws(() => loadSite(local), /Only the hosted frontend/);
+test("built bundles contain only the five checked assets and the correct fixture mode", () => {
+  for (const [name, mode] of [["hosted-browser", "hosted"], ["local-browser", "local"]]) {
+    const directory = fileURLToPath(new URL(`../dist/${name}/`, import.meta.url));
+    const files = readdirSync(directory, { recursive: true }).filter((name) => name !== "pkg").sort();
+    assert.deepEqual(files, [...FILES].sort());
+    for (const file of FILES) assert.ok(readAsset(directory, file).length > 0);
+    assert.ok(readFileSync(`${directory}index.html`, "utf8").includes(`data-fixture="${mode}"`));
+  }
 });
 
 class Element {
@@ -30,15 +31,23 @@ class Button extends Element {}
 class Input extends Element {}
 class Textarea extends Element {}
 
-for (const mode of ["hosted", "local"] as const) {
-  test(`built ${mode} page boots real PQ WASM at a nested manifest URL without connecting`, async () => {
-    const directory = fileURLToPath(new URL(`../dist/${mode === "hosted" ? "irys-browser" : "local-browser"}/`, import.meta.url));
+const sites = [
+  { name: "hosted", mode: "hosted", directory: "../dist/hosted-browser/", url: "https://example.invalid/nested/manifest/" },
+  { name: "local", mode: "local", directory: "../dist/local-browser/", url: "https://example.invalid/nested/manifest/" },
+  ...(process.env.ANDROID_CONTROLLER_TEST === "1" ? [{
+    name: "Android-bundled", mode: "hosted", directory: "../../android-controller/generated/assets/controller/",
+    url: "http://127.0.0.1:18787/controller/",
+  }] : []),
+];
+for (const { name, mode, directory: relative, url } of sites) {
+  test(`built ${name} page boots real PQ WASM without connecting`, async () => {
+    const directory = fileURLToPath(new URL(relative, import.meta.url));
     const html = readFileSync(`${directory}index.html`, "utf8");
     assert.ok(html.includes(`data-fixture="${mode}"`));
     assert.match(html, /src="\.\/app\.js"/);
     assert.match(html, /href="\.\/style\.css"/);
     assert.ok(!html.includes("/src/") && !html.includes(".ts\""));
-    const page = new URL("https://example.invalid/nested/manifest/");
+    const page = new URL(url);
     const requests: string[] = [];
     let connections = 0;
     const status = new Paragraph();

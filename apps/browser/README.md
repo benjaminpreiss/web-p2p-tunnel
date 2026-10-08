@@ -1,20 +1,17 @@
-# Irys browser client
+# Browser tunnel controller
 
-A **Vite + vanilla TypeScript + CSS** client, with no UI framework, remote fonts,
-or browser-side wallet dependencies. The existing Saorsa PQ/WebRTC flow is retained.
-The native terminal helper remains in `experiments/relay-spike/`; `web/` is unrelated
-legacy code. Both baseline and migrated Irys-hosted phone echoes passed: publisher
-authentication, a matching 25-byte encrypted echo, and nonzero MASQUE bridge
-traffic in both directions with zero rejected sources. This validates the bounded
-LAN diagnostic, not public-network traversal or a complete localhost web tunnel.
+A **Vite + vanilla TypeScript + CSS** controller, with no UI framework, remote
+fonts or wallet dependencies. Chrome/Brave owns the Saorsa PQ/WebRTC session;
+`experiments/relay-spike/` contains the computer helper. `web/` is unrelated legacy
+Go/signaling code.
 
-The new **opt-in HTTP inspector** is locally tested but has not yet passed its
-own hosted-phone gate. It requires a fresh private visitor token and fetches a
-bounded batch of GET paths from one explicitly configured localhost port. Results
-are inert text/base64, separate from shareable diagnostics—not transparent app
-rendering. See [HTTP inspector instructions](../../docs/HTTP-INSPECTOR.md).
+The APK-delivered controller has passed the authorized bounded LAN HTTP test:
+publisher authentication, visitor authorization, expected HTML/CSS, bidirectional
+relay counters and clean shutdown. Responses are inert text/base64—not executable
+target pages. See [HTTP inspector instructions](../../docs/HTTP-INSPECTOR.md).
+The former Irys publisher and deployment workflow have been removed.
 
-## Install and build (repository root, normal terminal)
+## Install and build (repository root)
 
 Requires Node 24, Rust stable, `wasm32-unknown-unknown`, and `wasm-pack` on PATH.
 
@@ -23,17 +20,17 @@ npm ci --prefix apps/browser --ignore-scripts
 npm --prefix apps/browser run build
 ```
 
-The build has three steps:
+1. `build.ts` builds release PQ WASM from the locked `crypto/` crate, remapping
+   identifying home, toolchain, dependency and repository paths.
+2. Vite bundles `src/app.ts` and CSS into `dist/frontend/`. Relative URLs and
+   explicit crypto asset copying preserve nested-path delivery. No framework,
+   arbitrary public directory, source maps or inlined WASM.
+3. `export.ts` checks and prepares:
+   - **`dist/hosted-browser/`**: manual descriptor/token entry, no metadata server.
+   - **`dist/local-browser/`**: the desktop helper's guarded session/counter APIs.
 
-1. `build.ts` builds release PQ WASM from the locked `crypto/` crate. It remaps
-   identifying home, toolchain, dependency and repository paths in Rust output.
-2. Vite type-checks/bundles `src/app.ts`, minifies JS/CSS, and emits an intermediate
-   `dist/frontend/` folder. `base: "./"` keeps URLs manifest-relative. An explicit
-   plugin copies only the generated crypto JS/WASM, after privacy/size/path checks.
-   `publicDir` is disabled: arbitrary static files are never automatically copied.
-3. `export.ts` validates and prepares both bundles:
-   - **`dist/irys-browser/`**: hosted mode, descriptor paste, no local metadata fetch.
-   - **`dist/local-browser/`**: local helper mode, retaining guarded session/counter APIs.
+“Hosted” means manually configured standalone controller, not a particular hosting
+provider. Android stages that same mode in its APK at `/controller/`.
 
 Each bundle contains exactly:
 
@@ -45,20 +42,10 @@ pkg/relay_crypto.js
 pkg/relay_crypto_bg.wasm
 ```
 
-The configuration parser is bundled into `app.js`; it is no longer a separate
-`hosted-config.mjs` asset. There are no source maps or inlined WASM. The generated
-crypto module remains external so its sibling WASM resolution stays unchanged.
-The app locates that module relative to the document's manifest URL.
-
-On the first migration build, an old output folder may still contain the obsolete
-`hosted-config.mjs`. The exporter deliberately refuses unexpected files instead
-of silently deleting them. Review and remove only the obsolete generated output
-(or the generated `apps/browser/dist/` directory), then rebuild.
-
-The exporter rejects symlinks, unexpected output, invalid WASM and embedded user
-home paths, and writes SHA-256 checksums outside the upload folder. Raw wasm-pack
-invocations without path remapping should not be used for publishable assets.
-Builds never upload or fund anything. Generated assets and dependencies are ignored.
+The exporter rejects symlinks, unexpected output, invalid WASM and embedded home
+paths. Checksums stay outside the asset directory. Build/export never deploys
+anything. Generated assets/dependencies are ignored. Unexpected old output must
+be reviewed explicitly, never silently deleted by the exporter.
 
 ## Frontend iteration (existing WASM required)
 
@@ -68,13 +55,13 @@ npm --prefix apps/browser run build:frontend
 npm --prefix apps/browser run preview
 ```
 
-`dev` provides the descriptor-paste UI on loopback. `preview` serves the hosted
-production bundle on loopback. Neither starts a relay, supplies session metadata,
-or makes an insecure LAN URL safe for phone WebRTC. Use the deployed HTTPS page
-for phone acceptance; do not weaken browser security or bind dev servers publicly.
-`build:frontend` reuses generated `pkg/` assets and does not invoke Cargo.
-`npm --prefix apps/browser run export` only re-exports a previously built Vite
-intermediate folder; it does not rebuild stale source code.
+Dev/preview serve the manual-descriptor UI on computer loopback; they do not start
+a relay or supply metadata. `build:frontend` reuses generated `pkg/` files and does
+not run Cargo. `npm --prefix apps/browser run export` only exports already-built
+frontend files, so use the build command after source changes.
+
+For phone testing, use the [Android static server](../android-controller/README.md).
+Do not bind development servers publicly or weaken browser security.
 
 ## Checks
 
@@ -84,35 +71,30 @@ npm --prefix apps/browser test
 npm --prefix apps/browser run test:bundle
 ```
 
-Browser type checking requires the generated WASM declarations. `test:bundle`
-requires built output and executes minified app code plus real PQ WASM with a
-minimal browser-API harness at a nested HTTPS manifest path. It verifies hosted
-startup makes only crypto-asset requests, local startup additionally fetches
-session metadata, and neither connects automatically. It does **not** test visual
-rendering, real browser security policy, or actual WebRTC/PQ echo connectivity.
-The VM-module flag is for Node tests only.
+Type checking covers both the browser UI and Node build/export/test tools through
+`tsconfig.json` and `tsconfig.tools.json`; generated WASM declarations are required.
+There is no publisher project or SDK dependency.
 
-Node build/export tools and tests are also checked by the publisher's TypeScript
-configuration. Install both projects before running that aggregate check:
+`test:bundle` requires built output. It checks the five-file allowlist and runs
+minified app code plus real PQ WASM at nested URLs using a browser-API harness.
+Hosted startup loads only crypto assets; local startup also fetches session
+metadata. Neither connects automatically. The harness does not prove visual
+rendering, real CSP enforcement or WebRTC connectivity. The VM flag is test-only.
+
+## APK delivery and acceptance
 
 ```sh
-npm ci --prefix deployment/irys --ignore-scripts
-npm --prefix deployment/irys run typecheck
+node apps/android-controller/prepare.ts
 ```
 
-Frontend and publisher dependency trees are separate. The frontend dependency
-scan was clean at migration time; that does not resolve the publisher SDK's
-previously documented advisories.
+Then rebuild/run the Android project and manually open
+`http://127.0.0.1:18787/controller/` on the phone. Preparation uses the current
+working tree; no commit, merge or deployment is needed. See
+[Android instructions](../android-controller/README.md) for build prerequisites,
+the known launch-button 403, cleanup and the repeatable HTTP test.
 
-## Acceptance and deployment
-
-Rebuild local helpers with `bash experiments/relay-spike/hosted.sh build`; local
-HTTP modes now read their generated bundle rather than embedding raw source JS.
-The exact Host/Origin/fetch-site checks are unchanged. Hosted helper mode still
-starts no HTTP server and needs no frontend files to run.
-
-Publication setup: [Irys publisher](../../deployment/irys/README.md).
-After a reviewed PR merges and CI publishes, repeat the
-[phone/helper acceptance test](../../experiments/relay-spike/HOSTED.md): fresh
-trusted descriptor, authenticated 25-byte echo, and bidirectional terminal bridge
-counters. Do not infer mobile success from the offline boot harness alone.
+Rebuild the computer helper with `bash experiments/relay-spike/hosted.sh build`.
+Its `browser-hosted` mode needs no frontend files or HTTP metadata server. Use
+fresh descriptors/private grants and verify actual results plus final bridge
+counters. Stopping the Android file server does not revoke an existing browser
+connection; stop the computer helper and close the controller tab.

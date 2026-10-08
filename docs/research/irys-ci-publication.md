@@ -1,5 +1,8 @@
 # Irys CI publication: payment and SDK findings
 
+> Historical research. The publisher and deployment workflow have been removed;
+> this is not current deployment guidance.
+
 Implementation-time primary-source check for replacing GitHub Pages. No live
 wallet funding, upload, or cross-chain fee comparison was performed. Research was
 performed directly in this session; no background-agent tool was available.

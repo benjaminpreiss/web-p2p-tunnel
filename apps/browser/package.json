@@ -7,9 +7,9 @@
     "dev": "vite --configLoader native",
     "build": "node build.ts --release && npm run build:frontend",
     "build:frontend": "npm run typecheck && vite build --configLoader native && node export.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.tools.json",
     "export": "node export.ts",
-    "preview": "vite preview --outDir dist/irys-browser --configLoader native",
+    "preview": "vite preview --outDir dist/hosted-browser --configLoader native",
     "test": "node --test tests/*.test.ts",
     "test:bundle": "node --experimental-vm-modules --test smoke/*.test.ts"
   },

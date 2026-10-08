@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "types": ["node"] },
+  "include": ["*.ts", "tests/*.ts", "smoke/*.ts", "fixtures/*.ts"]
+}

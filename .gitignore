@@ -12,6 +12,9 @@ wallet.json
 *.keystore
 invitation.json
 
+# Retired publisher: preserve local wallets/reports without ever committing them.
+/deployment/irys/
+
 # Local build output, dependency caches, logs and editor state.
 node_modules/
 target/

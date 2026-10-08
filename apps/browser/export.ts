@@ -69,8 +69,8 @@ export function buildBundle(source: string, destination: string, mode: "hosted" 
 }
 
 export function exportSite(source: string): Map<string, Buffer> {
-  const destination = join(source, "dist/irys-browser");
-  const checksumPath = join(source, "dist/irys-browser.SHA256SUMS");
+  const destination = join(source, "dist/hosted-browser");
+  const checksumPath = join(source, "dist/hosted-browser.SHA256SUMS");
   rejectSymlinkChain(checksumPath);
   const checksumStat = lstatSync(checksumPath, { throwIfNoEntry: false });
   if (checksumStat && !checksumStat.isFile()) throw new Error("Invalid checksum output path.");
@@ -87,9 +87,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     const source = realpathSync(fileURLToPath(new URL(".", import.meta.url)));
     const assets = exportSite(source);
     for (const [name, bytes] of assets) console.log(`${bytes.length} bytes  ${name}`);
-    console.log("Static bundle: apps/browser/dist/irys-browser/");
-    console.log("Checksums: apps/browser/dist/irys-browser.SHA256SUMS (not an Irys manifest)");
-    console.log("Nothing uploaded. No wallet or payment operation performed.");
+    console.log("Static bundle: apps/browser/dist/hosted-browser/");
+    console.log("Checksums: apps/browser/dist/hosted-browser.SHA256SUMS");
+    console.log("Local build only. Nothing deployed.");
   } catch {
     // Filesystem exceptions can contain personal absolute paths.
     console.error("Export failed. Check assets/output paths and rebuild with apps/browser/build.ts; embedded user-home paths are forbidden.");

@@ -11,8 +11,8 @@ use saorsa_transport::{
     NatTraversalEndpoint,
     transport::{WebRtcCertificateHash, WebRtcDirectAddr},
     webrtc::{
-        accept_pq_session,
-        direct::{WebRtcCertificate, WebRtcDirectListener},
+        PqSession, accept_pq_session,
+        direct::{WebRtcCertificate, WebRtcDataChannel, WebRtcDirectListener},
     },
 };
 use std::{
@@ -269,12 +269,9 @@ async fn serve(
         if let Some(mut inspector) = inspector {
             // One authorization record, then at most 16 sequential requests.
             for _ in 0..17 {
-                let record = match timeout(Duration::from_secs(30), channel.receive()).await? {
-                    Ok(record) => record,
-                    Err(_) => break, // A completed batch may close its DataChannel.
+                let Some(request) = receive_inspector_request(&channel, &mut session).await? else {
+                    break;
                 };
-                ensure!(record.len() <= 16384, "oversized encrypted inspector record");
-                let request = Zeroizing::new(session.open(&record).context("decrypt inspector request")?);
                 let response = match inspector.handle(&request).await {
                     Ok(response) => response,
                     Err(_) => {
@@ -345,6 +342,25 @@ async fn serve(
             "browser fixture background task stopped unexpectedly"
         )),
     }
+}
+
+async fn receive_inspector_request(
+    channel: &WebRtcDataChannel,
+    session: &mut PqSession,
+) -> Result<Option<Zeroizing<Vec<u8>>>> {
+    let record = timeout(Duration::from_secs(30), channel.receive()).await??;
+    // Pinned Saorsa receive() uses an empty vector for channel close/reset.
+    // This ends access; it is not an encrypted record or application success.
+    if record.is_empty() {
+        return Ok(None);
+    }
+    ensure!(
+        record.len() <= 16384,
+        "oversized encrypted inspector record"
+    );
+    Ok(Some(Zeroizing::new(
+        session.open(&record).context("decrypt inspector request")?,
+    )))
 }
 
 fn snapshot(counters: &bridge::Counters) -> serde_json::Value {
@@ -477,6 +493,88 @@ async fn http_request(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn peer_shutdown_after_reply_does_not_yield_a_truncated_pq_record() -> Result<()> {
+        check_post_reply_record(None).await
+    }
+
+    #[tokio::test]
+    async fn nonempty_truncated_record_after_reply_is_still_an_error() -> Result<()> {
+        check_post_reply_record(Some(b"x")).await
+    }
+
+    async fn check_post_reply_record(trailing: Option<&'static [u8]>) -> Result<()> {
+        use saorsa_transport::webrtc::{PqClientHandshake, direct::WebRtcDirectClient};
+        let (read_done, read_complete) = tokio::sync::oneshot::channel();
+        let certificate = WebRtcCertificate::generate()?;
+        let pin = WebRtcCertificateHash::new(certificate.sha256_digest()?);
+        let mut listener = WebRtcDirectListener::bind("127.0.0.1:0".parse()?, certificate).await?;
+        let destination = WebRtcDirectAddr::new(listener.local_addr(), pin)?;
+        let dsa = ml_dsa_65();
+        let (public, secret) = dsa.generate_keypair()?;
+        let public = public.to_bytes();
+        let publisher = *blake3::hash(&public).as_bytes();
+        let server = async move {
+            let mut connection = listener.accept().await?;
+            let channel = connection.accept_data_channel().await?;
+            let hello = channel.receive().await?;
+            let (accept, mut session) =
+                accept_pq_session(&hello, &publisher, &public, |transcript| {
+                    dsa.sign(&secret, transcript)
+                        .map(|signature| signature.to_bytes())
+                })?;
+            channel.send(&accept).await?;
+            let request = session.open(&channel.receive().await?)?;
+            channel.send(&session.seal(&request)?).await?;
+            // Exercise the production reader, including real transport EOF.
+            let request = timeout(
+                Duration::from_secs(2),
+                receive_inspector_request(&channel, &mut session),
+            )
+            .await?;
+            if trailing.is_some() {
+                let error = request.expect_err("nonempty malformed data was mistaken for closure");
+                ensure!(
+                    format!("{error:#}").contains("encrypted record is truncated"),
+                    "unexpected rejection reason"
+                );
+            } else {
+                ensure!(
+                    request?.is_none(),
+                    "peer shutdown yielded an application request"
+                );
+            }
+            let _ = read_done.send(());
+            Ok::<_, anyhow::Error>(())
+        };
+        let client = async {
+            let visitor = WebRtcDirectClient::dial(&destination, http_inspector::LABEL).await?;
+            let channel = visitor.data_channel();
+            let (handshake, hello) = PqClientHandshake::start()?;
+            channel.send(&hello).await?;
+            let mut session = handshake.finish(&channel.receive().await?, &publisher)?;
+            channel.send(&session.seal(b"completed request")?).await?;
+            ensure!(
+                session.open(&channel.receive().await?)? == b"completed request",
+                "reply mismatch"
+            );
+            if let Some(record) = trailing {
+                channel.send(record).await?;
+                // Don't let transport closure race ahead of the bad record.
+                read_complete.await?;
+                let _ = visitor.close().await;
+            } else {
+                visitor.close().await?;
+            }
+            Ok::<_, anyhow::Error>(())
+        };
+        timeout(Duration::from_secs(15), async {
+            tokio::try_join!(server, client)
+        })
+        .await??;
+        Ok(())
+    }
 
     #[test]
     fn phone_configuration_rejects_public_loopback_and_identical_addresses() {

@@ -1,4 +1,9 @@
-# Irys publisher: status and migration handoff
+# Archived: Irys publisher status and migration handoff
+
+> The publisher code and publishing workflow have been removed at the user's
+> request. This is historical documentation, not runnable checkout instructions.
+> Recover the appropriate historical Git revision before using the copy commands
+> below. The active controller is bundled in the Android APK.
 
 ## Summary
 

@@ -30,13 +30,13 @@ test("exports only the five static assets, with hosted mode and external checksu
       copyFileSync(join(f.source, name), target);
     }
     const assets = exportSite(f.source);
-    const output = join(f.source, "dist/irys-browser");
+    const output = join(f.source, "dist/hosted-browser");
     assert.deepEqual(readdirSync(output, { recursive: true }).filter((name) => name !== "pkg").sort(), [...FILES].sort());
     assert.match(readFileSync(join(output, "index.html"), "utf8"), /data-fixture="hosted"/);
     assert.match(readFileSync(join(f.source, "index.html"), "utf8"), /data-fixture="local"/);
     assert.match(readFileSync(join(f.source, "dist/local-browser/index.html"), "utf8"), /data-fixture="local"/);
     const expected = [...assets].map(([name, bytes]) => `${createHash("sha256").update(bytes).digest("hex")}  ${name}\n`).join("");
-    assert.equal(readFileSync(join(f.source, "dist/irys-browser.SHA256SUMS"), "utf8"), expected);
+    assert.equal(readFileSync(join(f.source, "dist/hosted-browser.SHA256SUMS"), "utf8"), expected);
   } finally { f.close(); }
 });
 
@@ -84,9 +84,9 @@ test("symlinked output ancestors and checksum files are rejected", () => {
     symlinkSync(join(f.root, "actual"), join(f.root, "alias"), "dir");
     assert.throws(() => buildBundle(f.source, join(f.root, "alias/output")), /symlinked/);
     mkdirSync(join(f.source, "dist"));
-    symlinkSync(join(f.source, "session.json"), join(f.source, "dist/irys-browser.SHA256SUMS"));
+    symlinkSync(join(f.source, "session.json"), join(f.source, "dist/hosted-browser.SHA256SUMS"));
     assert.throws(() => exportSite(f.source), /symlinked/);
-    assert.equal(existsSync(join(f.source, "dist/irys-browser")), false);
+    assert.equal(existsSync(join(f.source, "dist/hosted-browser")), false);
   } finally { f.close(); }
 });
 

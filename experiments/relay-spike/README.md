@@ -2,28 +2,27 @@
 
 **Resume here:** [project status](../../docs/STATUS.md).
 
-**New, local checks only:** [token-authorized HTTP inspector](../../docs/HTTP-INSPECTOR.md).
-Explicitly opt in to one loopback port, then fetch a bounded GET batch from the
-phone. This is not transparent app browsing; a new hosted-phone acceptance run
-is still required. The original echo modes remain available.
+**Hosted HTTP forwarding passed:** [token-authorized inspector](../../docs/HTTP-INSPECTOR.md).
+The phone fetched expected HTML/CSS from one loopback port with authorization and
+bidirectional relay counters. A repeated phone run also confirmed clean shutdown
+after the helper-only EOF fix. This is not transparent app browsing. Original echo
+modes remain available.
 
-Current direction: an Irys-hosted browser client, terminal computer helper, and
-pinned Saorsa MASQUE relay path. Android app and SSH development are cancelled.
-The local desktop, USB-delivered phone-browser and now **Irys-hosted phone-browser
-LAN tests have passed**.
+Current direction: an APK-bundled browser controller, terminal computer helper,
+and pinned Saorsa MASQUE relay path. The Android app serves static files only;
+Chrome/Brave owns WebRTC/PQ. The old native Android tunnel and SSH remain cancelled.
+Irys publisher code and deployment CI have been removed.
 
-**Latest result:** [static Irys-hosted page, no USB](HOSTED.md). The hosted phone
-page loaded PQ WASM, authenticated the publisher and matched a 25-byte encrypted
-echo, including after the Vite/TypeScript migration. Latest counters: relay →
-listener **35 packets / 12,397 bytes**, listener → relay **33 packets / 9,290 bytes**,
-**zero rejected sources**. The user completed
-publication and rebuilt the helper before this run. Build with
-`bash experiments/relay-spike/hosted.sh build` from the repository root.
+**Latest result:** [APK-local controller](../../apps/android-controller/README.md)
+loaded PQ WASM and passed authorized HTTP inspection. Relay → listener:
+**35 packets / 11,305 bytes**; listener → relay: **35 packets / 10,059 bytes**;
+**zero rejected sources**, clean shutdown. See [manual-descriptor LAN mode](HOSTED.md).
+Build with `bash experiments/relay-spike/hosted.sh build` from repository root.
 
-**Throwaway diagnostic, not the production tunnel.** This does not forward HTTP,
-expose a localhost application or contact public relay peers. The separate Irys
-workflow publishes the static diagnostic website, not a tunneled application.
-The existing Go tunnel is unchanged.
+**Experimental, not a production tunnel.** Default echo modes expose no target
+application; opt-in HTTP mode exposes only bounded, token-authorized GETs to one
+configured loopback port. No public relay deployment is authorized. The legacy
+Go tunnel is unchanged; older diagnostic notes below describe earlier gates.
 
 ## Question
 

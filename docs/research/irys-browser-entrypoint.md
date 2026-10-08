@@ -1,5 +1,8 @@
 # Irys as the HTTPS entry point for the Autonomi tunnel
 
+> Historical hosting research. Irys publishing has been removed from this repo;
+> the current controller is delivered by the installed Android static server.
+
 ## Verdict
 
 **Yes for hosting the browser entry page: supported by current official documentation and observed live HTTP behavior.** Irys supports executable HTML delivery, folder manifests, and isolated per-transaction CDN origins. No application-owned domain or continuously running frontend server is necessary.
